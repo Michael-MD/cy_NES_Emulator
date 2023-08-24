@@ -27,9 +27,10 @@ class CPU6502:
 	"""
 	Implements high level 6502 CPU. 
 	Datasheet: http://datasheets.chipdb.org/Rockwell/6502.pdf
-	https://www.pagetable.com/c64ref/6502/?tab=0
+	Instruction Set: https://www.pagetable.com/c64ref/6502/?tab=0
+	Assembler: https://www.masswerk.at/6502/assembler.html
 	"""
-	def __init__(self, bus = None):
+	def __init__(self, bus=None, debugging_mode=False):
 		self.a = 0x00 		# Accumulator Register
 		self.x = 0x00 		# X Register
 		self.y = 0x00 		# Y Register
@@ -48,6 +49,7 @@ class CPU6502:
 		self._addr_rel = 0x0000	# Stores relative address from jump location
 		self._opcode = 0x00		# Stores instruction opcode
 		self._cycles = 0 		# Stores number of remaining instruction cycles
+		self._debugging_mode = debugging_mode
 
 		self.lookup = np.full(16**2, Instruction('???', opcode=self.XXX, addr_mode=self.IMP, cycles=2), dtype=Instruction)
 
@@ -238,12 +240,12 @@ class CPU6502:
 
 		# Obtain pc address from location 0xFFFC
 		self._addr_abs = 0xFFFC
-		self.lo = self.read(self._addr_abs)
-		self.hi = self.read(self._addr_abs+1)
+		lo = self.read(self._addr_abs)
+		hi = self.read(self._addr_abs+1)
 
 		self.pc = (hi<<8) | lo
 
-		self.cycles = 8
+		self._cycles = 8
 
 	# Servicing maskable interrupts
 	def irq(self):
@@ -266,7 +268,7 @@ class CPU6502:
 			lo = self.read(self._addr_abs + 1)
 			self.pc = (hi<<8) | lo
 
-			self.cycles = 7
+			self._cycles = 7
 
 	# Servicing non-maskable interrupts
 	def nmi(self):
@@ -288,11 +290,11 @@ class CPU6502:
 		lo = self.read(self._addr_abs + 1)
 		self.pc = (hi<<8) | lo
 
-		self.cycles = 8
+		self._cycles = 8
 
 	# Triggers clock cycle
 	def clock(self):
-		if cycles == 0: 	# Next instruction ready
+		if self._cycles == 0: 	# Next instruction ready
 			# Service interrupts first
 			if self._nm_interrupt:
 				self.nmi()
@@ -309,6 +311,9 @@ class CPU6502:
 
 			# Get appropriate instruction
 			instruction = self.lookup[self.opcode]
+			
+			if self._debugging_mode:
+				print(instruction.name)
 
 			# Get absolute address
 			additional_clock_cycle_1 = (instruction.addr_mode)()
@@ -317,13 +322,23 @@ class CPU6502:
 			additional_clock_cycle_2 = (instruction.opcode)()
 
 			# Store number of required clock cycles
-			self.cycles = instruction.cycles + (additional_clock_cycle_1 & additional_clock_cycle_2)
+			self._cycles = instruction.cycles
+			# self._cycles = instruction.cycles + (additional_clock_cycle_1 & additional_clock_cycle_2)
 
 			# Always set unused flag
 			self.set_flag(flags.U, 1)
 
 		else:
-			self.cycles-=1
+			self._cycles-=1
+
+	# Print CPU internal state
+	def __str__(self):
+		return 	f'a: 		{hex(self.a)} \n' \
+				+ f'x: 		{hex(self.x)} \n' \
+				+ f'y: 		{hex(self.y)} \n' \
+				+ f'stkp: 	{hex(self.stkp)} \n' \
+				+ f'pc: 	{hex(self.pc)} \n' \
+				+ f'status: {hex(self.status)} \n'
 
 	# Instruction addressing modes
 	"""
@@ -382,8 +397,8 @@ class CPU6502:
 		self._addr_rel = self.read(self.pc)
 		self.pc+=1
 
-		if self._addr_rel & 0x80:
-			self._addr_rel |= 0xFF00
+		if self._addr_rel > 127:
+			self._addr_rel -= 256
 
 		return 0
 	
@@ -392,9 +407,9 @@ class CPU6502:
 	Third byte of instruction specifies high-order address byte.
 	"""
 	def ABS(self):
-		self._addr_abs = read(self.pc) & 0x00FF	# Low byte
+		self._addr_abs = self.read(self.pc) & 0x00FF	# Low byte
 		self.pc+=1
-		self._addr_abs |= (read(self.pc)<<8)	# High byte
+		self._addr_abs |= (self.read(self.pc)<<8)	# High byte
 		self.pc+=1
 		return 0
 
@@ -404,9 +419,10 @@ class CPU6502:
 	are added to the absolute address. If page changes, the addition clock cycle is required.
 	"""
 	def ABX(self):
-		self._addr_abs = read(self.pc) & 0x00FF	# Low byte
+		print(hex(self.opcode))
+		self._addr_abs = self.read(self.pc) & 0x00FF	# Low byte
 		self.pc+=1
-		hi = (read(self.pc)<<8) 	# High byte
+		hi = (self.read(self.pc)<<8) 	# High byte
 		self._addr_abs |= hi
 		self.pc+=1
 		self._addr_abs += self.x
@@ -482,7 +498,6 @@ class CPU6502:
 		if self.lookup[self.opcode] != self.IMP:
 			self._fetched = self.read(self._addr_abs)
 
-
 	# Instruction opcodes
 	"""
 	ADC - Add memory to accumulator with carry.
@@ -539,11 +554,11 @@ class CPU6502:
 	"""
 	def BCC(self):
 		if self.get_flag(flags.C) == 0:
-			self.cycles+=1
+			self._cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
 
 			if (self._addr_abs&0xFF00) != (self.pc&0xFF00):	# If page boundary crossed
-				self.cycles+=1
+				self._cycles+=1
 
 			self.pc = self._addr_abs
 
@@ -558,11 +573,11 @@ class CPU6502:
 	"""
 	def BCS(self):
 		if self.get_flag(flags.C) == 1:
-			self.cycles+=1
+			self._cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
 
 			if (self._addr_abs&0xFF00) != (self.pc&0xFF00):	# If page boundary crossed
-				self.cycles+=1
+				self._cycles+=1
 
 			self.pc = self._addr_abs
 
@@ -578,11 +593,11 @@ class CPU6502:
 	"""
 	def BEQ(self):
 		if self.get_flag(flags.Z) == 1:
-			self.cycles+=1
+			self._cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
 
 			if (self._addr_abs&0xFF00) != (self.pc&0xFF00):	# If page boundary crossed
-				self.cycles+=1
+				self._cycles+=1
 
 			self.pc = self._addr_abs
 
@@ -604,11 +619,11 @@ class CPU6502:
 	"""
 	def BMI(self):
 		if self.get_flag(flags.N) == 1:
-			self.cycles+=1
+			self._cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
 
 			if (self._addr_abs&0xFF00) != (self.pc&0xFF00):	# If page boundary crossed
-				self.cycles+=1
+				self._cycles+=1
 
 			self.pc = self._addr_abs
 
@@ -618,11 +633,11 @@ class CPU6502:
 	"""
 	def BNE(self):
 		if self.get_flag(flags.Z) == 0:
-			self.cycles+=1
+			self._cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
 
 			if (self._addr_abs&0xFF00) != (self.pc&0xFF00):	# If page boundary crossed
-				self.cycles+=1
+				self._cycles+=1
 
 			self.pc = self._addr_abs
 
@@ -632,11 +647,11 @@ class CPU6502:
 	"""
 	def BPL(self):
 		if self.get_flag(flags.N) == 0:
-			self.cycles+=1
+			self._cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
 
 			if (self._addr_abs&0xFF00) != (self.pc&0xFF00):	# If page boundary crossed
-				self.cycles+=1
+				self._cycles+=1
 
 			self.pc = self._addr_abs
 
@@ -651,7 +666,7 @@ class CPU6502:
 		self.write(0x100 + self.stkp, self.pc & 0xFF)		# Store low byte
 		self.stkp-=1
 
-		self.set_flag(self.I, 1)
+		self.set_flag(flags.I, 1)
 
 		# Store status registor in stack
 		self.write(0x100 + self.stkp, self.status & 0xFF)		# Store low byte
@@ -668,11 +683,11 @@ class CPU6502:
 	"""
 	def BVC(self):
 		if self.get_flag(flags.V) == 0:
-			self.cycles+=1
+			self._cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
 
 			if (self._addr_abs&0xFF00) != (self.pc&0xFF00):	# If page boundary crossed
-				self.cycles+=1
+				self._cycles+=1
 
 			self.pc = self._addr_abs
 
@@ -682,11 +697,11 @@ class CPU6502:
 	"""
 	def BVS(self):
 		if self.get_flag(flags.V) == 1:
-			self.cycles+=1
+			self._cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
 
 			if (self._addr_abs&0xFF00) != (self.pc&0xFF00):	# If page boundary crossed
-				self.cycles+=1
+				self._cycles+=1
 
 			self.pc = self._addr_abs
 	
@@ -730,9 +745,9 @@ class CPU6502:
 	def CMP(self):
 		self.fetch()
 		temp = self.a - self._fetched
-		self.set_flag(self.C, self.a >= self._fetched)
-		self.set_flag(self.Z, (temp&0xFF) == 0x00)
-		self.set_flag(self.N, temp & 0x80)
+		self.set_flag(flags.C, self.a >= self._fetched)
+		self.set_flag(flags.Z, (temp&0xFF) == 0x00)
+		self.set_flag(flags.N, temp & 0x80)
 
 	"""
 	CPX  - Compares X register with memory location
@@ -742,9 +757,9 @@ class CPU6502:
 	def CPX(self):
 		self.fetch()
 		temp = self.x - self._fetched
-		self.set_flag(self.C, self.x >= self._fetched)
-		self.set_flag(self.Z, (temp&0xFF) == 0x00)
-		self.set_flag(self.N, temp & 0x80)
+		self.set_flag(flags.C, self.x >= self._fetched)
+		self.set_flag(flags.Z, (temp&0xFF) == 0x00)
+		self.set_flag(flags.N, temp & 0x80)
 	
 	"""
 	CPY  - Compares Y register with memory location
@@ -754,9 +769,9 @@ class CPU6502:
 	def CPY(self):
 		self.fetch()
 		temp = self.y - self._fetched
-		self.set_flag(self.C, self.y >= self._fetched)
-		self.set_flag(self.Z, (temp&0xFF) == 0x00)
-		self.set_flag(self.N, temp & 0x80)
+		self.set_flag(flags.C, self.y >= self._fetched)
+		self.set_flag(flags.Z, (temp&0xFF) == 0x00)
+		self.set_flag(flags.N, temp & 0x80)
 	
 	"""
 	DEC - Decrement Memory By One
@@ -766,8 +781,8 @@ class CPU6502:
 	def DEC(self):
 		self.fetch()
 		temp = self._fetched - 1
-		self.set_flag(self.Z, (temp&0xFF) == 0)
-		self.set_flag(self.N, temp & 0x80)
+		self.set_flag(flags.Z, (temp&0xFF) == 0)
+		self.set_flag(flags.N, temp & 0x80)
 		self.write(self._addr_abs, temp&0xFF)
 
 	"""
@@ -778,8 +793,8 @@ class CPU6502:
 	def DEX(self):
 		self.x-=1
 		self.x&=0xFF
-		self.set_flag(self.Z, self.x == 0)
-		self.set_flag(self.N, self.x & 0x80)
+		self.set_flag(flags.Z, self.x == 0)
+		self.set_flag(flags.N, self.x & 0x80)
 
 	"""
 	DEY - Decrement Index Register Y By One
@@ -788,9 +803,8 @@ class CPU6502:
 	"""
 	def DEY(self):
 		self.y-=1
-		self.y&=0xFF
-		self.set_flag(self.Z, self.x == 0)
-		self.set_flag(self.N, self.x & 0x80)
+		self.set_flag(flags.Z, self.y == 0)
+		self.set_flag(flags.N, self.y & 0x80)
 
 	"""
 	EOR - "Exclusive OR" Memory with Accumulator
@@ -1121,8 +1135,8 @@ class CPU6502:
 	"""
 	def TAX(self):
 		self.x = self.a
-		self.set_flag(self.N, self.x & 0x80)
-		self.set_flag(self.Z, self.x == 0)
+		self.set_flag(flags.N, self.x & 0x80)
+		self.set_flag(flags.Z, self.x == 0)
 
 	"""
 	TAX - Transfer Accumulator To Index Y
@@ -1131,11 +1145,8 @@ class CPU6502:
 	"""
 	def TAY(self):
 		self.y = self.a
-		self.set_flag(self.N, self.y & 0x80)
-		self.set_flag(self.Z, self.y == 0)
-
-	def TRB(self): ...
-	def TSB(self): ...
+		self.set_flag(flags.N, self.y & 0x80)
+		self.set_flag(flags.Z, self.y == 0)
 
 	"""
 	TSX - Transfer Stack Pointer To Index X
@@ -1144,8 +1155,8 @@ class CPU6502:
 	"""
 	def TSX(self):
 		self.x = self.stkp
-		self.set_flag(self.N, self.x & 0x80)
-		self.set_flag(self.Z, self.x == 0)
+		self.set_flag(flags.N, self.x & 0x80)
+		self.set_flag(flags.Z, self.x == 0)
 
 	"""
 	TXA - Transfer Index X To Accumulator
@@ -1154,8 +1165,8 @@ class CPU6502:
 	"""
 	def TXA(self):
 		self.a = self.x
-		self.set_flag(self.N, self.a & 0x80)
-		self.set_flag(self.Z, self.a == 0)
+		self.set_flag(flags.N, self.a & 0x80)
+		self.set_flag(flags.Z, self.a == 0)
 
 	"""
 	TXS - Transfer Index X To Stack Pointer
@@ -1164,8 +1175,8 @@ class CPU6502:
 	"""
 	def TXS(self):
 		self.stkp = self.x
-		self.set_flag(self.N, self.stkp & 0x80)
-		self.set_flag(self.Z, self.stkp == 0)
+		self.set_flag(flags.N, self.stkp & 0x80)
+		self.set_flag(flags.Z, self.stkp == 0)
 
 	"""
 	TYA - Transfer Index Y To Accumulator
@@ -1174,8 +1185,9 @@ class CPU6502:
 	"""
 	def TYA(self):
 		self.a = self.y
-		self.set_flag(self.N, self.a & 0x80)
-		self.set_flag(self.Z, self.a == 0)
+		self.set_flag(flags.N, self.a & 0x80)
+		self.set_flag(flags.Z, self.a == 0)
 
 	# Invalid instruction
-	def XXX(self): ...
+	def XXX(self):
+		print('???')
