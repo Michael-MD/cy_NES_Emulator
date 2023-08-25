@@ -5,6 +5,7 @@ class Cartridge:
 	def __init__(self, n_prog_chunks, n_char_chunks):
 		self.bus = None
 		self.ppu = None
+		self.mapper = None
 
 		self.n_prog_chunks = n_prog_chunks
 		self.n_char_chunks = n_char_chunks
@@ -17,6 +18,9 @@ class Cartridge:
 
 	def connect_ppu(self, ppu):
 		self.ppu = ppu
+
+	def connect_mapper(self, mapper):
+		self.mapper = mapper
 
 	def write(self, addr, data):
 		...

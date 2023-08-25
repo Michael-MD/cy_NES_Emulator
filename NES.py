@@ -4,6 +4,7 @@ from .CPU6502 import CPU6502
 from .Bus import Bus
 from .Cartridge import Cartridge
 from .PPU import PPU
+from .Mappers import Mapper_000
 
 class NES:
 	def __init__(self, rom_directory):
@@ -43,6 +44,13 @@ class NES:
 
 		# Instantiate cartridge class and load with program and palette data
 		self.cart = Cartridge(n_prog_chunks, n_char_chunks)
+
+		if self.n_mapper_ID == 0:
+			mapper = Mapper_000
+		
+		self.cart.connect_mapper(
+			mapper(int(n_prog_chunks/2), n_char_chunks)
+		)
 
 		offset = 0
 		if byte_trainer:
