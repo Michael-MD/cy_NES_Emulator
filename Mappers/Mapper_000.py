@@ -32,7 +32,7 @@ class Mapper_000(Mapper):
 			If 32kB then just remove address 0x8000 offset. 
 			If 16kB then mirror address (0x3FFF = 16kB). 
 			"""
-			mapped_addr = addr & (self.prog_banks > 1 ? 0x7FFF : 0x3FFF)
+			mapped_addr = addr & (0x7FFF if self.prog_banks > 1 else 0x3FFF)
 			return mapped_addr
 
 		return False
@@ -40,7 +40,7 @@ class Mapper_000(Mapper):
 
 	def cpu_map_read(self, addr, bReadOnly: bool = False):
 		if addr >= 0x8000 and addr <= 0xFFFF:
-			mapped_addr = addr & (self.prog_banks > 1 ? 0x7FFF : 0x3FFF)
+			mapped_addr = addr & (0x7FFF if self.prog_banks > 1 else 0x3FFF)
 			return mapped_addr
 
 		return False
