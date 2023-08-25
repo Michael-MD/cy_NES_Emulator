@@ -22,8 +22,26 @@ class Cartridge:
 	def connect_mapper(self, mapper):
 		self.mapper = mapper
 
-	def write(self, addr, data):
-		...
+	# PPU with internal bus communication
+	def ppu_write(self, addr, data):
+		if (mapped_addr:=self.mapper.ppu_map_write(addr, data)):
+			self.v_char_memory[mapped_addr] = data
+			return True
+		return False
+		
+	def ppu_read(self, addr, bReadOnly: bool = False):
+		if (mapped_addr:=self.mapper.ppu_map_read(addr)):
+			return self.v_char_memory[mapped_addr]
+		return False
 
-	def read(self, addr, bReadOnly: bool = False):
-		return 0x00
+	# CPU-PPU registers communication 
+	def cpu_write(self, addr, data):
+		if (mapped_addr:=self.mapper.cpu_map_write(addr)):
+			self.v_prog_memory[mapped_addr] = data
+			return True
+		return False
+		
+	def cpu_read(self, addr, bReadOnly: bool = False):
+		if (mapped_addr:=self.mapper.cpu_map_read(addr)):
+			return self.v_prog_memory[mapped_addr]
+		return False

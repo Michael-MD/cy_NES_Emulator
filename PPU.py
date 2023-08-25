@@ -19,16 +19,20 @@ class PPU:
 	def connect_bus(self, bus):
 		self.bus = bus
 
-	# PPU bus communication
+	# PPU with internal bus communication
 	def ppu_write(self, addr, data):
-		...
+		addr &= 0x3FFF	# Ensure in addressable range
+		if self.cartridge.ppu_write(addr, data):		# Write to cartridge
+			...
 
 	def ppu_read(self, addr, bReadOnly: bool = False):
-		return 0x00
+		addr &= 0x3FFF	# Ensure in addressable range
+		if (data:=self.cartridge.ppu_read(addr, bReadOnly)):	# Read from cartridge
+			return data
 
-	# CPU bus communication
+	# CPU to PPU registers communication 
 	def cpu_write(self, addr, data):
 		...
 
 	def cpu_read(self, addr, bReadOnly: bool = False):
-		return 0x00
+		...

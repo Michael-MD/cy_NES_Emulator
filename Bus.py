@@ -26,14 +26,23 @@ class Bus:
 		cartridge.connect_bus(self)
 
 	def write(self, addr: np.uint16, data: np.uint8):
-		if addr >= 0x0000 and addr <= 0x1FFF:		# Write to CPU RAM
+		if self.cartridge.cpu_write(addr, data):		# Write to cartridge
+			"""
+			Since different mappers may accept and regect different 
+			memmory ranges. We have the read and write return if the
+			value specified is in the cartridge addressable range.
+			"""
+			...
+		elif addr >= 0x0000 and addr <= 0x1FFF:		# Write to CPU RAM
 			self.cpu_ram[addr & 0x1FFF] = data
 		elif addr >= 0x2000 and addr <= 0x3FFF:		# Write to PPU
-			ppu.write(addr, data)
+			ppu.cpu_write(addr & 0x0007, data)		# PPU has 8 registers
 
 	def read(self, addr: np.uint16, bReadOnly: bool = False):
-		if addr >= 0x0000 and addr <= 0x1FFF:		# Read from CPU RAM
+		if self.cartridge.cpu_read(addr, bReadOnly):	# Read from cartridge
+			...
+		elif addr >= 0x0000 and addr <= 0x1FFF:		# Read from CPU RAM
 			return self.cpu_ram[addr & 0x1FFF]	# Maps 8kB addressable memory to 2kB of physical memory (mirroring)
 		elif addr >= 0x2000 and addr <= 0x3FFF:		# Read from PPU
-			return ppu.read(addr, data, bReadOnly)
+			return ppu.cpu_read(addr & 0x0007, bReadOnly)	# PPU has 8 registers
 		return 0x00
