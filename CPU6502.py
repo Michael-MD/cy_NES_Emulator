@@ -30,7 +30,7 @@ class CPU6502:
 	Instruction Set: https://www.pagetable.com/c64ref/6502/?tab=0
 	Assembler: https://www.masswerk.at/6502/assembler.html
 	"""
-	def __init__(self, bus=None, debugging_mode=False):
+	def __init__(self, debugging_mode=False):
 		self.a = 0x00 		# Accumulator Register
 		self.x = 0x00 		# X Register
 		self.y = 0x00 		# Y Register
@@ -42,7 +42,6 @@ class CPU6502:
 		self._nm_interrupt = False # Non-maskable interrupt pin
 
 		self.bus = None
-		self.connect_bus(bus)
 
 		self._fetched = 0x00
 		self._addr_abs = 0x0000	# Stores absolute address
@@ -207,7 +206,6 @@ class CPU6502:
 
 	def connect_bus(self, bus: Bus):
 		self.bus = bus
-		bus.cpu = self
 
 	def write(self, addr: np.uint16, data: np.uint8):
 		self.bus.write(addr, data)
