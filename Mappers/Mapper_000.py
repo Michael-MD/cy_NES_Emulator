@@ -25,7 +25,7 @@ class Mapper_000(Mapper):
 
 	# CPU to mapper communication 
 	def cpu_map_write(self, addr, data):
-		if addr >= 0x8000 and addr <= 0xFFFF:
+		if addr >= 0x8000 and addr <= 0xFFFF:		# Cartridge
 			"""
 			If address within mapper range, then return mapped address which 
 			is indexed from zero to match ines file.
