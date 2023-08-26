@@ -2,6 +2,10 @@ import numpy as np
 from .Bus import Bus
 
 class Cartridge:
+	"""
+	Pattern (char) memory which contains sprite informations is located 
+	at address range 0x0000 to 0x1FFF.
+	"""
 	def __init__(self, n_prog_chunks, n_char_chunks):
 		self.bus = None
 		self.ppu = None

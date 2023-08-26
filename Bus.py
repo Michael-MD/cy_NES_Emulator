@@ -7,10 +7,17 @@ class Bus:
 		self.cartridge = None
 		self.cpu_ram = np.zeros(2 * 1024, dtype=np.uint8)	# 2kB CPU RAM
 
+		self.n_system_clock_counter = 0
+
 	def reset():
 		cpu.reset()
 
-	def clock(): ...
+	def clock():
+		self.ppu.clock()
+		if self.n_system_clock_counter % 3 == 0:	# PPU clock 3x faster than CPU
+			self.cpu.clock()
+
+		self.n_system_clock_counter+=1
 
 	# Connect Components
 	def connect_cpu(self, cpu):
