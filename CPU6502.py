@@ -1,6 +1,7 @@
 from .Bus import Bus
 import numpy as np
 from enum import Enum
+import pdb
 
 """ 
 Masks to be used for easily accessing individual bits of 
@@ -303,6 +304,7 @@ class CPU6502:
 				self._interrupt = False
 
 			# Read opcode from memory
+			# pdb.set_trace()
 			self.opcode = self.read(self.pc)
 			self.opcode&=0xFF
 			self.pc+=1
@@ -311,8 +313,12 @@ class CPU6502:
 			instruction = self.lookup[self.opcode]
 			
 			if self._debugging_mode:
-				print(instruction.name)
+				print(hex(self.opcode), instruction.name)
+				print(hex(self.pc-1))
+				print('\n')
 
+			if self.pc == 0x800a+1:
+				pdb.set_trace()
 			# Get absolute address
 			additional_clock_cycle_1 = (instruction.addr_mode)()
 

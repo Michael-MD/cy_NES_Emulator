@@ -6,6 +6,8 @@ from .Cartridge import Cartridge
 from .PPU import PPU
 from .Mappers import Mapper000
 
+import pdb
+
 class NES:
 	def __init__(self, rom_directory):
 		self.rom_name, self.file_ext = os.path.splitext(rom_directory)
@@ -49,7 +51,7 @@ class NES:
 			mapper = Mapper000
 		
 		self.cart.connect_mapper(
-			mapper(int(n_prog_chunks/2), n_char_chunks)
+			mapper(n_prog_chunks, n_char_chunks)
 		)
 
 		offset = 0
@@ -65,12 +67,21 @@ class NES:
 
 		# Set up NES system components
 		self.bus = Bus()
-		self.cpu = CPU6502()
+		self.cpu = CPU6502(debugging_mode=True)
 		self.ppu = PPU()
 
 		self.bus.connect_cpu(self.cpu)
 		self.bus.connect_ppu(self.ppu)
 		self.bus.connect_cartridge(self.cart)
 		self.ppu.connect_cartridge(self.cart)
+
+		# Reset everything
+		self.reset()
+
+	def reset(self):
+		self.cpu.reset()
+
+	def clock(self):
+		self.bus.clock()
 
 

@@ -9,28 +9,25 @@ class Bus:
 
 		self.n_system_clock_counter = 0
 
-	def reset():
-		cpu.reset()
-
-	def clock():
-		self.ppu.clock()
+	def clock(self):
 		if self.n_system_clock_counter % 3 == 0:	# PPU clock 3x faster than CPU
 			self.cpu.clock()
+		self.ppu.clock()
 
 		self.n_system_clock_counter+=1
 
 	# Connect Components
 	def connect_cpu(self, cpu):
 		self.cpu = cpu
-		cpu.connect_bus(self)
+		self.cpu.connect_bus(self)
 
 	def connect_ppu(self, ppu):
 		self.ppu = ppu
-		ppu.connect_bus(self)
+		self.ppu.connect_bus(self)
 
 	def connect_cartridge(self, cartridge):
 		self.cartridge = cartridge
-		cartridge.connect_bus(self)
+		self.cartridge.connect_bus(self)
 
 	def write(self, addr: np.uint16, data: np.uint8):
 		if self.cartridge.cpu_write(addr, data):		# Write to cartridge
@@ -43,13 +40,14 @@ class Bus:
 		elif addr >= 0x0000 and addr <= 0x1FFF:		# Write to CPU RAM
 			self.cpu_ram[addr & 0x1FFF] = data
 		elif addr >= 0x2000 and addr <= 0x3FFF:		# Write to PPU
-			ppu.cpu_write(addr & 0x0007, data)		# PPU has 8 registers
+			self.ppu.cpu_write(addr & 0x0007, data)		# PPU has 8 registers
 
 	def read(self, addr: np.uint16, bReadOnly: bool = False):
-		if self.cartridge.cpu_read(addr, bReadOnly):	# Read from cartridge
-			...
+		data, valid_addr = self.cartridge.cpu_read(addr, bReadOnly)
+		if valid_addr:	# Read from cartridge
+			return data
 		elif addr >= 0x0000 and addr <= 0x1FFF:		# Read from CPU RAM
-			return self.cpu_ram[addr & 0x1FFF]	# Maps 8kB addressable memory to 2kB of physical memory (mirroring)
+			return self.cpu_ram[addr & 0x07FF]	# Maps 8kB addressable memory to 2kB of physical memory (mirroring)
 		elif addr >= 0x2000 and addr <= 0x3FFF:		# Read from PPU
-			return ppu.cpu_read(addr & 0x0007, bReadOnly)	# PPU has 8 registers
+			return self.ppu.cpu_read(addr & 0x0007, bReadOnly)	# PPU has 8 registers
 		return 0x00

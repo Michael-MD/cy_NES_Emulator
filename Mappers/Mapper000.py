@@ -1,5 +1,5 @@
 from .Mapper import Mapper
-
+import pdb
 class Mapper000(Mapper):
 	# PPU with mapper communication
 	def ppu_map_write(self, addr, data):
@@ -35,6 +35,6 @@ class Mapper000(Mapper):
 	def cpu_map_read(self, addr, bReadOnly: bool = False):
 		if addr >= 0x8000 and addr <= 0xFFFF:
 			mapped_addr = addr & (0x7FFF if self.prog_banks > 1 else 0x3FFF)
-			return mapped_addr
+			return mapped_addr, True
 
-		return False
+		return 0x00, False

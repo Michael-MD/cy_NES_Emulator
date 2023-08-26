@@ -17,10 +17,19 @@ class PPU:
 		self.cycle = 0 	# Column
 		self.scan_line = 0
 
+		# Internal registers
+		self.ctrl = 0x00
+		self.mask = 0x00
+		self.status = 0x00
+		self.scroll = 0x00
+		self.addr = 0x0000
+		self.data = 0x00
+
 		# Components attached to PPU bus
 		self.name_table = np.zeros([2,1024], dtype=np.uint8)	# 2 1kB name tables
 		self.palettes = np.zeros(32, dtype=np.uint8)	# 32 bytes
 		self.colours = np.zeros([64,3], dtype=np.uint8)	# 64 bytes of available colours
+
 
 		# Stores sprite pattern information
 		self._sprite = None
@@ -84,7 +93,7 @@ class PPU:
 		self.colours[0x3C] = [160, 214, 228]
 		self.colours[0x3D] = [160, 162, 160]
 
-	def clock():
+	def clock(self):
 		self.cycle+=1
 		if self.cycle >= 341:	# Finished column
 			self.cycle = 0
@@ -134,7 +143,7 @@ class PPU:
 			data = self.palettes[addr]
 
 		return data
-		
+
 	# CPU to PPU registers communication 
 	def cpu_write(self, addr, data):
 		...
@@ -184,4 +193,3 @@ class PPU:
 		"""
 		for ind, pixel in np.ndenumerate(self._sprite):
 			self._sprite[ind] = self.colours[self.ppu_read(0x3FFF + (palette<<2) + pixel)]
-		self.pixel_2_sprite(palette)
