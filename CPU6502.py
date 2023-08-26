@@ -304,7 +304,6 @@ class CPU6502:
 				self._interrupt = False
 
 			# Read opcode from memory
-			# pdb.set_trace()
 			self.opcode = self.read(self.pc)
 			self.opcode&=0xFF
 			self.pc+=1
@@ -317,8 +316,6 @@ class CPU6502:
 				print(hex(self.pc-1))
 				print('\n')
 
-			if self.pc == 0x800a+1:
-				pdb.set_trace()
 			# Get absolute address
 			additional_clock_cycle_1 = (instruction.addr_mode)()
 
