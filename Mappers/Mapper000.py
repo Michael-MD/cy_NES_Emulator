@@ -1,6 +1,6 @@
 from .Mapper import Mapper
 
-class Mapper_000(Mapper):
+class Mapper000(Mapper):
 	# PPU with mapper communication
 	def ppu_map_write(self, addr, data):
 		"""
@@ -12,12 +12,6 @@ class Mapper_000(Mapper):
 
 	def ppu_map_read(self, addr, bReadOnly: bool = False):
 		if addr >= 0x0000 and addr <= 0x1FFF:
-			"""
-			If address within mapper range, then return mapped address which 
-			is indexed from zero to match ines file.
-			If 32kB then just remove address 0x8000 offset. 
-			If 16kB then mirror address (0x3FFF = 16kB). 
-			"""
 			mapped_addr = addr
 			return mapped_addr
 

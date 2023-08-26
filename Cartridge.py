@@ -13,8 +13,20 @@ class Cartridge:
 
 		self.n_prog_chunks = n_prog_chunks
 		self.n_char_chunks = n_char_chunks
-		self.v_prog_memory = np.zeros(n_prog_chunks * 16 * 1024, dtype=np.uint8)	# Single chunkchunk 16kB
-		self.v_char_memory = np.zeros(n_char_chunks * 8 * 1024, dtype=np.uint8)	# Single bank unk 8kB
+		self.v_prog_memory = np.zeros(n_prog_chunks * 16 * 1024, dtype=np.uint8)	# Single chunk 16kB
+		self.v_char_memory = np.zeros(n_char_chunks * 8 * 1024, dtype=np.uint8)		# Single chunk 8kB
+
+		"""
+		Restructures 1D array to ndarray with the following inputs
+			- 8kB chunk
+			- 1st or 2nd 4kB chunk
+			- tile row
+			- tile column
+			- lsb
+			- msb
+		"""
+		self.v_char_memory_nd = self.v_char_memory.reshape((n_char_chunks, 2, 16, 16, 2, 8))
+
 
 	# Connect Components
 	def connect_bus(self, bus):
@@ -34,7 +46,7 @@ class Cartridge:
 		return False
 		
 	def ppu_read(self, addr, bReadOnly: bool = False):
-		if (mapped_addr:=self.mapper.ppu_map_read(addr)):
+		if (mapped_addr:=self.mapper.ppu_map_read(addr)):			
 			return self.v_char_memory[mapped_addr]
 		return False
 
