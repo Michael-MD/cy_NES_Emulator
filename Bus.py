@@ -14,6 +14,10 @@ class Bus:
 			self.cpu.clock()
 		self.ppu.clock()
 
+		if self.ppu.nmi:
+			self.ppu.nmi = False
+			self.cpu.set_nmi(1) 
+
 		self.n_system_clock_counter+=1
 
 	# Connect Components

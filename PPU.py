@@ -72,6 +72,8 @@ class PPU:
 		self.data = 0x00
 
 		self._address_latch = 0x00
+		self._ppu_data_buffer = 0x00
+		self.nmi = False
 
 		# Components attached to PPU bus
 		self.name_table = np.zeros([2,1024], dtype=np.uint8)	# 2 1kB name tables
@@ -81,7 +83,7 @@ class PPU:
 		# Stores sprite pattern information
 		self._sprite = None
 
-		# Available colour RGB values
+		# Available colours in RGB
 		self.colours[0x00] = [84, 84, 84]
 		self.colours[0x01] = [0, 30, 116]
 		self.colours[0x02] = [8, 16, 144]
@@ -141,7 +143,15 @@ class PPU:
 		self.colours[0x3D] = [160, 162, 160]
 
 	def clock(self):
-		self.cycle+=1
+		if self.scan_line == -1 and self.cycle == 1:	# Unset vertical blank at top of page
+			self.status.b.vertical_blank = 0
+
+		if self.scan_line == 241 and self.cycle == 1:	# Set vertical blank at scan line below bottom of page and set nmi
+			self.status.b.vertical_blank = 1
+			if self.ctrl.b.enable_nmi:
+				self.nmi = True
+
+		self.cycle+=1 									# Scan across screen
 		if self.cycle >= 341:	# Finished column
 			self.cycle = 0
 			self.scan_line+=1
@@ -194,7 +204,7 @@ class PPU:
 	# CPU to PPU registers communication 
 	def cpu_write(self, addr, data):
 		if addr == 0x0000:			# Control
-			control.reg = data
+			self.ctrl.reg = data
 		elif addr == 0x0001:		# Mask
 			mask.reg = data
 		elif addr == 0x0002:		# Status
@@ -207,13 +217,14 @@ class PPU:
 			...
 		elif addr == 0x0006:		# PPU Address
 			if self._address_latch == 0:
-				self.ppu_addr = (self.ppu_addr&0xFF00) | data	# Writing low byte
+				self.ppu_addr = (self.ppu_addr&0x00FF) | (data<<8)	# Writing high byte
 				self._address_latch == 1
-			else
-				self.ppu_addr = (self.ppu_addr&0x00FF) | (data<<8)	# Writing low byte
+			else:
+				self.ppu_addr = (self.ppu_addr&0xFF00) | data	# Writing low byte
 				self._address_latch == 9
 		elif addr == 0x0007:		# PPU Data
-			self.ppu_write(addr, data)
+			self.ppu_write(self.ppu_addr, data)
+			self.ppu_addr+=1
 
 	def cpu_read(self, addr, bReadOnly: bool = False):
 		if addr == 0x0000:			# Control
@@ -221,7 +232,9 @@ class PPU:
 		elif addr == 0x0001:		# Mask
 			...
 		elif addr == 0x0002:		# Status
-			...
+			data = (self.status.reg)*0xE0 | (self._ppu_data_buffer&0x1F)
+			self.status.b.vertical_blank = 0
+			self._address_latch = 0
 		elif addr == 0x0003:		# OAM Address
 			...
 		elif addr == 0x0004:		# OAM Data
@@ -231,7 +244,15 @@ class PPU:
 		elif addr == 0x0006:		# PPU Address
 			return 0x00
 		elif addr == 0x0007:		# PPU Data
-			...
+			data = self._ppu_data_buffer
+			self._ppu_data_buffer = self.ppu_read(self.ppu_addr)
+
+			if addr > 0x3F00:					# Palette uses combinatorial logic which can output data in same clock cycle
+				data = self._ppu_data_buffer
+
+			self.ppu_addr+=1
+		return data
+
 
 	# Gets 2-bit color for single tile from pattern (char) memory
 	def get_tile(self, i, palette):
