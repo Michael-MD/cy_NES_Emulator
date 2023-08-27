@@ -1,4 +1,50 @@
 import numpy as np
+import ctypes
+c_uint8 = ctypes.c_uint8
+
+class StatusBits(ctypes.LittleEndianStructure):
+    _fields_ = [
+            ("unused", c_uint8, 5),
+            ("sprite_overflow", c_uint8, 1),
+            ("sprite_zero_hit", c_uint8, 1),
+            ("vertical_blank", c_uint8, 1),
+        ]
+
+class MaskBits(ctypes.LittleEndianStructure):
+    _fields_ = [
+            ("grayscale", c_uint8, 1),
+            ("render_background_left", c_uint8, 1),
+            ("render_sprites_left", c_uint8, 1),
+            ("render_background", c_uint8, 1),
+            ("render_sprites", c_uint8, 1),
+            ("enhance_red", c_uint8, 1),
+            ("enhance_green", c_uint8, 1),
+            ("enhance_blue", c_uint8, 1),
+        ]
+
+class CtrlBits(ctypes.LittleEndianStructure):
+    _fields_ = [
+            ("nametable_x", c_uint8, 1),
+            ("nametable_y", c_uint8, 1),
+            ("increment_mode", c_uint8, 1),
+            ("pattern_sprite", c_uint8, 1),
+            ("pattern_background", c_uint8, 1),
+            ("sprite_size", c_uint8, 1),
+            ("slave_mode", c_uint8, 1),		# Unused
+            ("enable_nmi", c_uint8, 1),
+        ]
+
+class Status(ctypes.Union):
+    _fields_ = [("b", StatusBits),
+                ("reg", c_uint8)]
+
+class Mask(ctypes.Union):
+    _fields_ = [("b", MaskBits),
+                ("reg", c_uint8)]
+
+class Ctrl(ctypes.Union):
+    _fields_ = [("b", CtrlBits),
+                ("reg", c_uint8)]
 
 class PPU:
 	"""
@@ -18,18 +64,19 @@ class PPU:
 		self.scan_line = 0
 
 		# Internal registers
-		self.ctrl = 0x00
-		self.mask = 0x00
-		self.status = 0x00
+		self.ctrl = Ctrl()
+		self.mask = Mask()
+		self.status = Status()
 		self.scroll = 0x00
-		self.addr = 0x0000
+		self.ppu_addr = 0x0000	# 14 bits
 		self.data = 0x00
+
+		self._address_latch = 0x00
 
 		# Components attached to PPU bus
 		self.name_table = np.zeros([2,1024], dtype=np.uint8)	# 2 1kB name tables
 		self.palettes = np.zeros(32, dtype=np.uint8)	# 32 bytes
 		self.colours = np.zeros([64,3], dtype=np.uint8)	# 64 bytes of available colours
-
 
 		# Stores sprite pattern information
 		self._sprite = None
@@ -146,10 +193,45 @@ class PPU:
 
 	# CPU to PPU registers communication 
 	def cpu_write(self, addr, data):
-		...
+		if addr == 0x0000:			# Control
+			control.reg = data
+		elif addr == 0x0001:		# Mask
+			mask.reg = data
+		elif addr == 0x0002:		# Status
+			...
+		elif addr == 0x0003:		# OAM Address
+			...
+		elif addr == 0x0004:		# OAM Data
+			...
+		elif addr == 0x0005:		# Scroll
+			...
+		elif addr == 0x0006:		# PPU Address
+			if self._address_latch == 0:
+				self.ppu_addr = (self.ppu_addr&0xFF00) | data	# Writing low byte
+				self._address_latch == 1
+			else
+				self.ppu_addr = (self.ppu_addr&0x00FF) | (data<<8)	# Writing low byte
+				self._address_latch == 9
+		elif addr == 0x0007:		# PPU Data
+			self.ppu_write(addr, data)
 
 	def cpu_read(self, addr, bReadOnly: bool = False):
-		...
+		if addr == 0x0000:			# Control
+			...
+		elif addr == 0x0001:		# Mask
+			...
+		elif addr == 0x0002:		# Status
+			...
+		elif addr == 0x0003:		# OAM Address
+			...
+		elif addr == 0x0004:		# OAM Data
+			...
+		elif addr == 0x0005:		# Scroll
+			...
+		elif addr == 0x0006:		# PPU Address
+			return 0x00
+		elif addr == 0x0007:		# PPU Data
+			...
 
 	# Gets 2-bit color for single tile from pattern (char) memory
 	def get_tile(self, i, palette):
