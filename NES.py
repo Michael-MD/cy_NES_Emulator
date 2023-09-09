@@ -67,7 +67,7 @@ class NES:
 
 		# Set up NES system components
 		self.bus = Bus()
-		self.cpu = CPU6502(debugging_mode=True)
+		self.cpu = CPU6502()
 		self.ppu = PPU()
 
 		self.bus.connect_cpu(self.cpu)
@@ -77,6 +77,7 @@ class NES:
 
 		# Reset everything
 		self.reset()
+		self.cpu._cycles = 0 	# Override instruction delay
 
 	def reset(self):
 		self.cpu.reset()

@@ -47,12 +47,13 @@ class Cartridge:
 		
 	def ppu_read(self, addr, bReadOnly: bool = False):
 		if (mapped_addr:=self.mapper.ppu_map_read(addr)):			
-			return self.v_char_memory[mapped_addr]
-		return False
+			return self.v_char_memory[mapped_addr], True
+		return 0x00, False
 
-	# CPU-PPU registers communication 
+	# CPU-Cart registers communication
 	def cpu_write(self, addr, data):
-		if (mapped_addr:=self.mapper.cpu_map_write(addr, data)):
+		mapped_addr, valid_addr = self.mapper.cpu_map_write(addr, data)
+		if valid_addr:
 			self.v_prog_memory[mapped_addr] = data
 			return True
 		return False

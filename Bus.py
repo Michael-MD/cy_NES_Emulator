@@ -10,9 +10,9 @@ class Bus:
 		self.n_system_clock_counter = 0
 
 	def clock(self):
+		self.ppu.clock()
 		if self.n_system_clock_counter % 3 == 0:	# PPU clock 3x faster than CPU
 			self.cpu.clock()
-		self.ppu.clock()
 
 		if self.ppu.nmi:
 			self.ppu.nmi = False
@@ -42,7 +42,7 @@ class Bus:
 			"""
 			...
 		elif addr >= 0x0000 and addr <= 0x1FFF:		# Write to CPU RAM
-			self.cpu_ram[addr & 0x1FFF] = data
+			self.cpu_ram[addr & 0x0FFF] = data		# Mirroring 2kB range to fill 8kB
 		elif addr >= 0x2000 and addr <= 0x3FFF:		# Write to PPU
 			self.ppu.cpu_write(addr & 0x0007, data)		# PPU has 8 registers
 

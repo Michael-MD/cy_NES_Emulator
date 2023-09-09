@@ -185,8 +185,8 @@ class PPU:
 
 	def ppu_read(self, addr, bReadOnly: bool = False):
 		addr &= 0x3FFF	# Ensure in addressable range
-		data = 0x00
-		if (data:=self.cartridge.ppu_read(addr, bReadOnly)):	# Read from cartridge (Pattern Memory)
+		data, valid_addr = self.cartridge.ppu_read(addr, bReadOnly)
+		if valid_addr:	# Read from cartridge (Pattern Memory)
 			...
 		elif (addr >= 0x2000) and (addr <= 0x3EFF):		# Name table memory
 			...
@@ -206,9 +206,9 @@ class PPU:
 		if addr == 0x0000:			# Control
 			self.ctrl.reg = data
 		elif addr == 0x0001:		# Mask
-			mask.reg = data
+			self.mask.reg = data
 		elif addr == 0x0002:		# Status
-			...
+			...	# Cannot be written to
 		elif addr == 0x0003:		# OAM Address
 			...
 		elif addr == 0x0004:		# OAM Data
@@ -218,22 +218,24 @@ class PPU:
 		elif addr == 0x0006:		# PPU Address
 			if self._address_latch == 0:
 				self.ppu_addr = (self.ppu_addr&0x00FF) | (data<<8)	# Writing high byte
-				self._address_latch == 1
+				self._address_latch = 1
 			else:
 				self.ppu_addr = (self.ppu_addr&0xFF00) | data	# Writing low byte
-				self._address_latch == 9
+				self._address_latch = 0
 		elif addr == 0x0007:		# PPU Data
 			self.ppu_write(self.ppu_addr, data)
 			self.ppu_addr+=1
 
 	def cpu_read(self, addr, bReadOnly: bool = False):
+		data = 0x00
 		if addr == 0x0000:			# Control
-			...
+			...	# Not readable
 		elif addr == 0x0001:		# Mask
-			...
+			... # Not readable
 		elif addr == 0x0002:		# Status
-			data = (self.status.reg)*0xE0 | (self._ppu_data_buffer&0x1F)
-			self.status.b.vertical_blank = 0
+			# self.status.b.vertical_blank = 1 	# Uncomment for quick testing
+			data = (self.status.reg&0xE0) | (self._ppu_data_buffer&0x1F)
+			# self.status.b.vertical_blank = 0
 			self._address_latch = 0
 		elif addr == 0x0003:		# OAM Address
 			...

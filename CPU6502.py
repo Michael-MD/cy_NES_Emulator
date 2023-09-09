@@ -1,4 +1,4 @@
-from Bus import Bus
+from .Bus import Bus
 import numpy as np
 from enum import Enum
 
