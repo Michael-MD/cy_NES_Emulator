@@ -1,6 +1,7 @@
 import numpy as np
 import ctypes
 c_uint8 = ctypes.c_uint8
+from .available_colours import pal_screen
 
 class StatusBits(ctypes.LittleEndianStructure):
     _fields_ = [
@@ -75,72 +76,14 @@ class PPU:
 		self._ppu_data_buffer = 0x00
 		self.nmi = False
 
-		# Components attached to PPU bus
+		# Components attached to PPU bus (pattern memory is implicit since it is contained in the cartridge)
 		self.name_table = np.zeros([2,1024], dtype=np.uint8)	# 2 1kB name tables
 		self.palettes = np.zeros(32, dtype=np.uint8)	# 32 bytes
-		self.colours = np.zeros([64,3], dtype=np.uint8)	# 64 bytes of available colours
+		self.colours = pal_screen
 
 		# Stores sprite pattern information
-		self._sprite = None
-
-		# Available colours in RGB
-		self.colours[0x00] = [84, 84, 84]
-		self.colours[0x01] = [0, 30, 116]
-		self.colours[0x02] = [8, 16, 144]
-		self.colours[0x03] = [48, 0, 136]
-		self.colours[0x04] = [68, 0, 100]
-		self.colours[0x05] = [92, 0, 48]
-		self.colours[0x06] = [84, 4, 0]
-		self.colours[0x07] = [60, 24, 0]
-		self.colours[0x08] = [32, 42, 0]
-		self.colours[0x09] = [8, 58, 0]
-		self.colours[0x0A] = [0, 64, 0]
-		self.colours[0x0B] = [0, 60, 0]
-		self.colours[0x0C] = [0, 50, 6]
-
-		self.colours[0x10] = [152, 150, 152]
-		self.colours[0x11] = [8, 76, 196]
-		self.colours[0x12] = [48, 50, 236]
-		self.colours[0x13] = [92, 30, 228]
-		self.colours[0x14] = [136, 20, 176]
-		self.colours[0x15] = [160, 20, 100]
-		self.colours[0x16] = [152, 34, 32]
-		self.colours[0x17] = [120, 60, 0]
-		self.colours[0x18] = [84, 90, 0]
-		self.colours[0x19] = [40, 114, 0]
-		self.colours[0x1A] = [8, 124, 0]
-		self.colours[0x1B] = [0, 118, 40]
-		self.colours[0x1C] = [0, 102, 120]
-
-		self.colours[0x20] = [236, 238, 236]
-		self.colours[0x21] = [76, 154, 236]
-		self.colours[0x22] = [120, 124, 236]
-		self.colours[0x23] = [176, 98, 236]
-		self.colours[0x24] = [228, 84, 236]
-		self.colours[0x25] = [236, 88, 180]
-		self.colours[0x26] = [236, 106, 100]
-		self.colours[0x27] = [212, 136, 32]
-		self.colours[0x28] = [160, 170, 0]
-		self.colours[0x29] = [116, 196, 0]
-		self.colours[0x2A] = [76, 208, 32]
-		self.colours[0x2B] = [56, 204, 108]
-		self.colours[0x2C] = [56, 180, 204]
-		self.colours[0x2D] = [60, 60, 60]
-
-		self.colours[0x30] = [236, 238, 236]
-		self.colours[0x31] = [168, 204, 236]
-		self.colours[0x32] = [188, 188, 236]
-		self.colours[0x33] = [212, 178, 236]
-		self.colours[0x34] = [236, 174, 236]
-		self.colours[0x35] = [236, 174, 212]
-		self.colours[0x36] = [236, 180, 176]
-		self.colours[0x37] = [228, 196, 144]
-		self.colours[0x38] = [204, 210, 120]
-		self.colours[0x39] = [180, 222, 120]
-		self.colours[0x3A] = [168, 226, 144]
-		self.colours[0x3B] = [152, 226, 180]
-		self.colours[0x3C] = [160, 214, 228]
-		self.colours[0x3D] = [160, 162, 160]
+		self._sprites_pixels = None
+		self._sprites_colours = None
 
 	def clock(self):
 		if self.scan_line == -1 and self.cycle == 1:	# Unset vertical blank at top of page
@@ -184,7 +127,7 @@ class PPU:
 			self.palettes[addr] = data
 
 	def ppu_read(self, addr, bReadOnly: bool = False):
-		addr &= 0x3FFF	# Ensure in addressable range
+		addr &= 0x3FFF	# Ensure in addressable range of PPU bus
 		data, valid_addr = self.cartridge.ppu_read(addr, bReadOnly)
 		if valid_addr:	# Read from cartridge (Pattern Memory)
 			...
@@ -257,44 +200,81 @@ class PPU:
 
 
 	# Gets 2-bit color for single tile from pattern (char) memory
-	def get_tile(self, i, palette):
+	def make_sprite_pixels(self):
 		"""
 		Pattern memory is split conceptually into two 4kB regions to make the full 8kB.
 		It stores a 2 bit number specifying the colour from some palette.
 		The first 4kB is usually sprites while the second is backgrounds.
+		
+		Description:
+		There are 16x16 tiles, each tile contains 8x8 pixels. Each pixel is 2 bits => each tile
+		is 8x8x2 = 128b = 16bytes. Each 4kB range contains 16x16 tiles, each 16 bytes = 4kB.
+		The two bits are used to index a colour in the palette.
 
-		A single tile is 8x16 bits or 16 bytes and two tiles next to each other specify the two bit number.
-		The first tile specifies the lower bit and the second specifies the upper bit.
-		Each 4kB range contains 16x16 tiles, each 16 bytes = 4kB.
-
+		Physical Storage:
+		The LSB and MSB (B for stands for bit here, not byte) are stored in "planes". The LSB plane
+		is stored first follows by MSB plane. Each row is one byte and the tile is unrapped in bytes.
+	
 		i: the first or second 4kB region 
 		palette: the row from the palettes table
 
-		To be proper we should make calls to the PPU. However I will ignore this since using numpy arrays 
-		to implement a half adder is clearer and very quick.
-		"""
-		# Pixel colors relative to some palette
-		lo, hi = self.cartridge.v_char_memory_nd[0, i,..., 0], self.cartridge.v_char_memory_nd[0, i,..., 1]
-		s = np.bitwise_xor(lo, hi)	# Sum
-		c = np.bitwise_and(lo, hi)	# Carry
+		To be proper we should make calls from the PPU. However I will ignore this since using numpy arrays 
+		to implement a half adder is clearer and very quick. 
 
-		self._sprite = np.empty([*s.shape, 8], dtype=np.uint8)
-		# Isolates individual bit and shift to left before adding sum to carry
-		self._sprite[...,0] = ((s&0x01)>>0) + ((c&0x01)>>0)
-		self._sprite[...,1] = ((s&0x02)>>1) + ((c&0x02)>>1)
-		self._sprite[...,2] = ((s&0x04)>>2) + ((c&0x04)>>2)
-		self._sprite[...,3] = ((s&0x08)>>3) + ((c&0x08)>>3)
-		self._sprite[...,4] = ((s&0x10)>>4) + ((c&0x10)>>4)
-		self._sprite[...,5] = ((s&0x20)>>5) + ((c&0x20)>>5)
-		self._sprite[...,6] = ((s&0x40)>>6) + ((c&0x40)>>6)
-		self._sprite[...,7] = ((s&0x80)>>7) + ((c&0x80)>>7)
+		This will need changing when we implement more complex mappers other than 000.
+		"""
+		# Populate palette memory
+		# if self.cartridge.mapper == Mapper_000:
+		lo, hi = self.cartridge.v_char_memory_nd[...,0,:], self.cartridge.v_char_memory_nd[...,1,:]
+		# Combines lower and upper bit to make pixel value
+		self._sprites_pixels = np.empty([*lo.shape, 8], dtype=np.uint8)	# NumPy doesn't have 2bit so 1byte is used i.e. 1byte atomicity
 
 		"""
-		Sprite with proper colours in corresponding slots
-		Takes sprite pixel info and return same dimensional array with 
-		colours.
-		Palette addressable range starts from 0x3FFF, then we offset to the correct 
-		palette by multiplying by 4, then we select the colour using pixel. 
+		Make table of palette offsets (pixels)
+		1. Isolates ith bit
+		2. Shifts high bit to the left by 1 further
+		3. Ors the low and high bits
+		4. Shifts result to that low bit is in the 0th position
 		"""
-		for ind, pixel in np.ndenumerate(self._sprite):
-			self._sprite[ind] = self.colours[self.ppu_read(0x3FFF + (palette<<2) + pixel)]
+		self._sprites_pixels[...,7] = np.bitwise_or(((hi&(1<<0))<<1), (lo&(1<<0)))>>0
+		self._sprites_pixels[...,6] = np.bitwise_or(((hi&(1<<1))<<1), (lo&(1<<1)))>>1
+		self._sprites_pixels[...,5] = np.bitwise_or(((hi&(1<<2))<<1), (lo&(1<<2)))>>2
+		self._sprites_pixels[...,4] = np.bitwise_or(((hi&(1<<3))<<1), (lo&(1<<3)))>>3
+		self._sprites_pixels[...,3] = np.bitwise_or(((hi&(1<<4))<<1), (lo&(1<<4)))>>4
+		self._sprites_pixels[...,2] = np.bitwise_or(((hi&(1<<5))<<1), (lo&(1<<5)))>>5
+		self._sprites_pixels[...,1] = np.bitwise_or(((hi&(1<<6))<<1), (lo&(1<<6)))>>6
+		self._sprites_pixels[...,0] = np.bitwise_or(((hi&(1<<7))<<1), (lo&(1<<7)))>>7
+
+
+	def make_sprite_colours(self, palette):
+		"""
+		We query the palette table to convert the 2-bit pixel values to 
+		RBG colours to be shown on the display.
+
+		The palette memory range is 0x3FFF to 0x3FFF. The palette contains the index of the colour in the display colours
+		array.
+		The first byte is the background.
+		Each 4-bytes thereafter are a palette. The pixel value determines which of the 4-bytes to use.
+		A colour is obtained by: 4*(palette #) + pixel.
+		The first 4 palettes are usually for bg and the next 4 are fg
+
+		The palette table is arranged as follows:
+		Palette #		0x3F00		bkgd
+		0				0x3F01		C1		C2		C3		bkgd
+		1				0x3F05		C1		C2		C3		bkgd
+		2				0x3F09		C1		C2		C3		bkgd
+		3				0x3F0D		C1		C2		C3		bkgd
+		4				0x3F11		C1		C2		C3		bkgd
+		5				0x3F15		C1		C2		C3		bkgd
+		6				0x3F19		C1		C2		C3		bkgd
+		7				0x3F1D		C1		C2		C3		bkgd
+		"""
+
+		if self._sprites_pixels is None:
+			self.make_sprite_pixels()
+
+		# Make table of colours
+		self._sprites_colours = np.empty([*self._sprites_pixels.shape, 3], dtype=np.uint8)
+
+		for ind, pixel in np.ndenumerate(self._sprites_pixels):
+			self._sprites_colours[ind] = self.colours[self.ppu_read(0x3F00 + (palette<<2) + pixel)]
