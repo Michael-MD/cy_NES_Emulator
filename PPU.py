@@ -72,8 +72,8 @@ class PPU:
 		self.ppu_addr = 0x0000	# 14 bits
 		self.data = 0x00
 
-		self._address_latch = 0x00
-		self._ppu_data_buffer = 0x00
+		self._address_latch = 0x00		# Keeps track of which address byte is being written
+		self._ppu_data_buffer = 0x00	# Stores data for clock cycle delay before it is returned to cpu
 		self.nmi = False
 
 		# Components attached to PPU bus (pattern memory is implicit since it is contained in the cartridge)
@@ -177,8 +177,9 @@ class PPU:
 			... # Not readable
 		elif addr == 0x0002:		# Status
 			# self.status.b.vertical_blank = 1 	# Uncomment for quick testing
+			# First 5 status registers unused usually and will contain noise or buffer data 
 			data = (self.status.reg&0xE0) | (self._ppu_data_buffer&0x1F)
-			# self.status.b.vertical_blank = 0
+			self.status.b.vertical_blank = 0
 			self._address_latch = 0
 		elif addr == 0x0003:		# OAM Address
 			...
@@ -187,12 +188,12 @@ class PPU:
 		elif addr == 0x0005:		# Scroll
 			...
 		elif addr == 0x0006:		# PPU Address
-			return 0x00
+			return 0x00 	# Cannot read address register
 		elif addr == 0x0007:		# PPU Data
 			data = self._ppu_data_buffer
 			self._ppu_data_buffer = self.ppu_read(self.ppu_addr)
 
-			if addr > 0x3F00:					# Palette uses combinatorial logic which can output data in same clock cycle
+			if self.ppu_addr > 0x3F00:					# Palette uses combinatorial logic which can output data in same clock cycle
 				data = self._ppu_data_buffer
 
 			self.ppu_addr+=1
@@ -234,17 +235,11 @@ class PPU:
 		1. Isolates ith bit
 		2. Shifts high bit to the left by 1 further
 		3. Ors the low and high bits
-		4. Shifts result to that low bit is in the 0th position
+		4. Shifts result so that low bit is in the 0th position
 		"""
-		self._sprites_pixels[...,7] = np.bitwise_or(((hi&(1<<0))<<1), (lo&(1<<0)))>>0
-		self._sprites_pixels[...,6] = np.bitwise_or(((hi&(1<<1))<<1), (lo&(1<<1)))>>1
-		self._sprites_pixels[...,5] = np.bitwise_or(((hi&(1<<2))<<1), (lo&(1<<2)))>>2
-		self._sprites_pixels[...,4] = np.bitwise_or(((hi&(1<<3))<<1), (lo&(1<<3)))>>3
-		self._sprites_pixels[...,3] = np.bitwise_or(((hi&(1<<4))<<1), (lo&(1<<4)))>>4
-		self._sprites_pixels[...,2] = np.bitwise_or(((hi&(1<<5))<<1), (lo&(1<<5)))>>5
-		self._sprites_pixels[...,1] = np.bitwise_or(((hi&(1<<6))<<1), (lo&(1<<6)))>>6
-		self._sprites_pixels[...,0] = np.bitwise_or(((hi&(1<<7))<<1), (lo&(1<<7)))>>7
-
+		for i in range(7):
+			self._sprites_pixels[...,(7-i)] = np.bitwise_or(((hi&(1<<i))<<1), (lo&(1<<i)))>>i
+		self._sprites_pixels[...,0] = np.bitwise_or(((hi&(1<<7))), (lo&(1<<7))>>1)>>6
 
 	def make_sprite_colours(self, palette):
 		"""
