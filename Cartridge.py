@@ -22,8 +22,8 @@ class Cartridge:
 			- 1st or 2nd 4kB chunk
 			- tile row
 			- tile column
-			- lsb
-			- msb
+			- lsb/msb i.e. plane
+			- pixel values represented as 8 rows of bytes
 		"""
 		self.v_char_memory_nd = self.v_char_memory.reshape((n_char_chunks, 2, 16, 16, 2, 8))
 
