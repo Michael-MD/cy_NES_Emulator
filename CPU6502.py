@@ -838,6 +838,7 @@ class CPU6502:
 	"""
 	def DEY(self):
 		self.y-=1
+		self.y&=0xFF
 		self.set_flag(flags.Z, self.y == 0)
 		self.set_flag(flags.N, self.y & 0x80)
 		return 0
