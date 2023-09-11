@@ -85,6 +85,8 @@ class PPU:
 		self._sprites_pixels = None
 		self._sprites_colours = None
 
+		self.v_mirroring = None
+
 	def clock(self):
 		if self.scan_line == -1 and self.cycle == 1:	# Unset vertical blank at top of page
 			self.status.b.vertical_blank = 0
@@ -116,7 +118,33 @@ class PPU:
 		if self.cartridge.ppu_write(addr, data):		# Write to cartridge
 			...
 		elif (addr >= 0x2000) and (addr <= 0x3EFF):		# Name table memory
-			...
+			"""
+			Each name table is 1kB divided into 32x32 8bit entries.
+			Each entry will point to a sprite in the pattern memory. There are 16x16 sprites which 
+			requires 256 bits.
+			The nametable uses mirroring to have 4 addressable nametables although only 2 physically exist.
+			The range on the bus is 7kB so we mirror the 4 name tables.
+			"""
+			addr &= 0x0FFF	# mirror 4kB
+			if self.v_mirroring:	# Vertical mirroring
+				if addr >= 0x0000 and addr <= 0x03FF:
+					self.name_table[0, addr & 0x3FF] = data
+				elif addr >= 0x0400 and addr <= 0x07FF:
+					self.name_table[1, addr & 0x3FF] = data
+				elif addr >= 0x0800 and addr <= 0x0BFF:
+					self.name_table[0, addr & 0x3FF] = data
+				elif addr >= 0x0C00 and addr <= 0x0FFF:
+					self.name_table[1, addr & 0x3FF] = data
+			else:	# Horizontal mirroring
+				if addr >= 0x0000 and addr <= 0x03FF:
+					self.name_table[0, addr & 0x3FF] = data
+				elif addr >= 0x0400 and addr <= 0x07FF:
+					self.name_table[0, addr & 0x3FF] = data
+				elif addr >= 0x0800 and addr <= 0x0BFF:
+					self.name_table[0, addr & 0x3FF] = data
+				elif addr >= 0x0C00 and addr <= 0x0FFF:
+					self.name_table[1, addr & 0x3FF] = data
+					
 		elif (addr >= 0x3F00) and (addr <= 0x3FFF):		# Palette memory
 			addr &= 0x1F	# address mod 32bytes
 			# Mirrors fg and bg colour palettes
@@ -132,7 +160,33 @@ class PPU:
 		if valid_addr:	# Read from cartridge (Pattern Memory)
 			...
 		elif (addr >= 0x2000) and (addr <= 0x3EFF):		# Name table memory
-			...
+			"""
+			Each name table is 1kB divided into 32x32 8bit entries.
+			Each entry will point to a sprite in the pattern memory. There are 16x16 sprites which 
+			requires 256 bits.
+			The nametable uses mirroring to have 4 addressable nametables although only 2 physically exist.
+			The range on the bus is 7kB so we mirror the 4 name tables.
+			"""
+			addr &= 0x0FFF	# mirror 4kB
+			if self.v_mirroring:	# Vertical mirroring
+				if addr >= 0x0000 and addr <= 0x03FF:
+					data = self.name_table[0, addr & 0x3FF]
+				elif addr >= 0x0400 and addr <= 0x07FF:
+					data = self.name_table[1, addr & 0x3FF]
+				elif addr >= 0x0800 and addr <= 0x0BFF:
+					data = self.name_table[0, addr & 0x3FF]
+				elif addr >= 0x0C00 and addr <= 0x0FFF:
+					data = self.name_table[1, addr & 0x3FF]
+			else:	# Horizontal mirroring
+				if addr >= 0x0000 and addr <= 0x03FF:
+					data = self.name_table[0, addr & 0x3FF]
+				elif addr >= 0x0400 and addr <= 0x07FF:
+					data = self.name_table[0, addr & 0x3FF]
+				elif addr >= 0x0800 and addr <= 0x0BFF:
+					data = self.name_table[0, addr & 0x3FF]
+				elif addr >= 0x0C00 and addr <= 0x0FFF:
+					data = self.name_table[1, addr & 0x3FF]
+
 		elif (addr >= 0x3F00) and (addr <= 0x3FFF):		# Palette memory
 			addr &= 0x1F	# address mod 32bytes
 			# Mirrors fg and bg colour palettes
@@ -246,7 +300,7 @@ class PPU:
 		We query the palette table to convert the 2-bit pixel values to 
 		RBG colours to be shown on the display.
 
-		The palette memory range is 0x3FFF to 0x3FFF. The palette contains the index of the colour in the display colours
+		The palette memory range is 0x3F00 to 0x3FFF. The palette contains the index of the colour in the display colours
 		array.
 		The first byte is the background.
 		Each 4-bytes thereafter are a palette. The pixel value determines which of the 4-bytes to use.

@@ -9,6 +9,9 @@ from .Mappers import Mapper000
 import pdb
 
 class NES:
+	"""
+	Description of iNES file formate: https://www.nesdev.org/wiki/INES#Flags_7
+	"""
 	def __init__(self, rom_directory):
 		self.rom_name, self.file_ext = os.path.splitext(rom_directory)
 		
@@ -24,7 +27,7 @@ class NES:
 			n_char_chunks = rom[5]	# specified in 8kB chunks
 
 			flag_6 = rom[6]
-			mirroring = flag_6 & (1<<0)
+			mirroring = flag_6 & (1<<0) 	# 0: horizontal, 1: vertical
 			persistent_memory = flag_6 & (1<<1)
 			byte_trainer = flag_6 & (1<<2)
 			four_screen_vram = flag_6 & (1<<3)
@@ -34,8 +37,7 @@ class NES:
 			vs_unisystem = flag_7 & (1<<0)
 			play_choice = flag_7 & (1<<1)
 			nes_2_format = flag_7 & (1<<2)
-			four_screen_vram = flag_7 & (1<<3)
-			n_mapper_ID_hi = flag_7 & 0xFF00
+			n_mapper_ID_hi = flag_7 >> 4
 
 			self.n_mapper_ID = n_mapper_ID_hi | n_mapper_ID_lo
 
@@ -69,6 +71,8 @@ class NES:
 		self.bus = Bus()
 		self.cpu = CPU6502()
 		self.ppu = PPU()
+
+		self.ppu.v_mirroring = mirroring
 
 		self.bus.connect_cpu(self.cpu)
 		self.bus.connect_ppu(self.ppu)
