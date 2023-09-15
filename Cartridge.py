@@ -40,13 +40,15 @@ class Cartridge:
 
 	# PPU with internal bus communication
 	def ppu_write(self, addr, data):
-		if (mapped_addr:=self.mapper.ppu_map_write(addr, data)):
+		mapped_addr, valid_addr = self.mapper.ppu_map_write(addr, data)
+		if valid_addr:	
 			self.v_char_memory[mapped_addr] = data
 			return True
 		return False
 		
 	def ppu_read(self, addr, bReadOnly: bool = False):
-		if (mapped_addr:=self.mapper.ppu_map_read(addr)):			
+		mapped_addr, valid_addr = self.mapper.ppu_map_read(addr)
+		if valid_addr:			
 			return self.v_char_memory[mapped_addr], True
 		return 0x00, False
 
