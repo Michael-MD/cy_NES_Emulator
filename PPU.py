@@ -1,6 +1,7 @@
 import numpy as np
 import ctypes
 c_uint8 = ctypes.c_uint8
+c_uint16 = ctypes.c_uint16
 from .available_colours import pal_screen
 
 class StatusBits(ctypes.LittleEndianStructure):
@@ -35,6 +36,16 @@ class CtrlBits(ctypes.LittleEndianStructure):
             ("enable_nmi", c_uint8, 1),
         ]
 
+class LoopyBits(ctypes.LittleEndianStructure):
+    _fields_ = [
+            ("coarse_x", c_uint8, 5),
+            ("coarse_y", c_uint8, 5),
+            ("nametable_x", c_uint8, 1),
+            ("nametable_y", c_uint8, 1),
+            ("fine_y", c_uint8, 3),
+            ("unused", c_uint8, 1),
+        ]
+
 class Status(ctypes.Union):
     _fields_ = [("b", StatusBits),
                 ("reg", c_uint8)]
@@ -46,6 +57,10 @@ class Mask(ctypes.Union):
 class Ctrl(ctypes.Union):
     _fields_ = [("b", CtrlBits),
                 ("reg", c_uint8)]
+
+class Loopy(ctypes.Union):
+    _fields_ = [("b", LoopyBits),
+                ("reg", c_uint16)]
 
 class PPU:
 	"""
@@ -68,8 +83,11 @@ class PPU:
 		self.ctrl = Ctrl()
 		self.mask = Mask()
 		self.status = Status()
+		self.loopy_t = Loopy()
+		self.loopy_v = Loopy()
+		self.fine_x = 0x00
 		self.scroll = 0x00
-		self.ppu_addr = 0x0000	# 14 bits
+		# self.ppu_addr = 0x0000	# 14 bits
 		self.data = 0x00
 
 		self._address_latch = 0x00		# Keeps track of which address byte is being written
@@ -77,7 +95,7 @@ class PPU:
 		self.nmi = False
 
 		# Components attached to PPU bus (pattern memory is implicit since it is contained in the cartridge)
-		self.name_table = np.zeros([2,1024], dtype=np.uint8)	# 2 1kB name tables
+		self.nametable = np.zeros([2,1024], dtype=np.uint8)	# 2 1kB name tables
 		self.palettes = np.zeros(32, dtype=np.uint8)	# 32 bytes
 		self.colours = pal_screen
 
@@ -87,21 +105,148 @@ class PPU:
 
 		self.v_mirroring = None
 
-	def clock(self):
-		if self.scan_line == -1 and self.cycle == 1:	# Unset vertical blank at top of page
-			self.status.b.vertical_blank = 0
+		# Temporarily store information about next sprite to be rendered.
+		self._bg_next_tile_id = 0x00
+		self._bg_next_tile_attr = 0x00
+		self._bg_next_tile_pixel = 0x0
+		self._bg_next_tile_lsb = 0
+		self._bg_next_tile_msb = 0
 
-		if self.scan_line == 241 and self.cycle == 1:	# Set vertical blank at scan line below bottom of page and set nmi
+	def clock(self):
+		# https://www.nesdev.org/w/images/default/4/4f/Ppu.svg
+		
+		if self.scan_line >= -1 and self.scan_line < 240:
+			if self.scan_line == -1 and self.cycle == 1:	# Unset vertical blank at top of page
+				self.status.b.vertical_blank = 0
+
+			if (self.cycle >=2 and self.cycle <= 258) or (self.cycle >=321 and self.cycle <= 338):
+				if (self.cycle-1)%8 == 0:	# Read background tile byte from nametable
+					"""
+					The loop v register keeps track of which part of the nametable is being shown on screen
+					and the pixel currently being rendered. This is stored in reference coarse y and x and fine y,
+					fine x is stored seperately. To find the offset into the name we:
+					 - offset by the name table and then
+					 - offset to current tile.
+					 0x0FFF is 12 bits which is what is required to offset into one of 4 nametables (2bits) and within
+					 a 32x30 grid (10bits). Total: 12bits. The remaining bits are unused.
+					 We then offset into the range the nametables are located on the bus. 
+					"""
+					self._bg_next_tile_id = self.ppu_read(0x2000|self.loopy_v.reg&0x0FFF)	
+
+				elif (self.cycle-1)%8 == 2:	# Prepare attribute
+					"""
+					To get the correct attribute byte we must specify
+						- Which nametable we are located. Since we have 4 conceptual namestables we require 2
+						bits to specify this. Each nametable is 32x32=1kB which requires 10bits to represent.
+						So the 11th and 12th bytes will specify which 1kB region we reside i.e. which nametable.
+
+						- Each nametable is divided into an 8x8 grid, since coase x and y cound nametable tiles i.e. 32x30,
+						if we ground the tiles into groups of 8x8, then the index can be obtained from the upper 3 bits of
+						coarse x and y.
+
+						- The nametables start at address 0x2000 on the bus so we offset the address by 0x2000.
+						Additionally, the attribute memory starts at 0x03C0 so we offset by that amount also within 
+						the selected nametable.
+
+					The final address should look as follows:
+					_ _ _ _   _ _ _ _   _ _ _ _   _ _ _ _
+					|         | |           | |   | | | |
+					|         | |           | |   | +-+-+------- coarse x
+					|         | |           +-+---+------------- coarse y
+					|         | +------------------------------- nametable x
+					|         +--------------------------------- nametable y     
+					+------------------------------------------- Beginning of nametable space on bus
+					The offset for the beginning of the attribute memory uses the remaining spots in three least
+					significant nibbles.
+					"""
+					self._bg_next_tile_attr = self.ppu_read((0x2000 + 0x03C0)	
+																| self.loopy_v.b.nametable_y << 11
+																| self.loopy_v.b.nametable_y << 10
+																| (self.loopy_v.b.coarse_y>>2) << 3
+																| (self.loopy_v.b.coarse_x>>2) << 0
+															)
+
+					"""
+					Each byte in the attribute memory specifies the palette for a group of 2x2 tiles in the 4x4 group,
+					of which recall there are 8x8. Since a palette only requires 2bits. The 8 bytes are divided into four parts,
+					each is designated 2x2 tiles. The least significant bits of coarse x and y we neglected before can now be used
+					to find out which 2x2 tile region of the 4x4 tile region we are in.
+					The bits are allocates as follows.
+					Top left: 0x03
+					Top right: 0x0C
+					Bottom left: 0x30
+					Bottom right: 0xC0
+
+					The code below selects the palette by ensuring the bottom 2 bits are the desired palette.
+					The first if shifts to ensure the correct row is in the bottom 4 bits and the second if statement
+					selects the correct column.
+					"""
+
+					if self.loopy_v.b.coarse_y&0x2: # Bottom row if > 0
+						self._bg_next_tile_attr >>= 4
+					if self.loopy_v.b.coarse_x&0x2: # Right column if > 0
+						self._bg_next_tile_attr >>= 2
+					self._bg_next_tile_attr&=0x03
+
+				elif (self.cycle-1)%8 == 4:	# Prepare pixel lsb
+					"""
+					Up to here we should have the address of the next sprite and the pallete to render it with.
+					All we have left to do is get the pixel value which is the offset into the chosen palette.
+					Usually during these two cycles and the next, the ppu will query the bus to 
+					get the sprite lsb and msb from the patternn table to obtain the appropriate
+					offset into the chosen palette. However, we take a high level approach here
+					where we directly obtain the lsb and msb using the data structure we have made.
+					"""
+					self._bg_next_tile_lsb = self.cartridge.v_char_memory_nd[	
+														0, 
+														self.ctrl.b.pattern_background,
+														(self._bg_next_tile_id&0x38)>>3,
+														self._bg_next_tile_id&0x07,
+														0,
+														self.loopy_v.b.fine_y 
+													]
+					
+				elif (self.cycle-1)%8 == 6:	# Prepare pixel msb
+					self._bg_next_tile_msb = self.cartridge.v_char_memory_nd[	
+														0, 
+														self.ctrl.b.pattern_background,
+														(self._bg_next_tile_id&0x38)>>3,
+														self._bg_next_tile_id&0x07,
+														1,
+														self.loopy_v.b.fine_y 
+													]
+
+				elif (self.cycle-1)%8 == 7:	# Increment tile pointer
+					"""
+					Information about pixel has been loaded so we can increment the course x to begin working on the 
+					next pixel.
+					"""
+					if self.mask.b.render_background or self.mask.b.render_sprites:
+						if self.loopy_v.b.coarse_x == 31:	# Boundary of nametable reached
+							self.loopy_v.b.coarse_x = 0
+							self.loopy_v.b.nametable_x^=1 # Negate nametable bit to increment nametable
+						else:
+							self.loopy_v.b.coarse_x+=1
+
+
+		# Set vertical blank at scan line below bottom of page and set nmi i.e. emit interrupt
+		if self.scan_line == 241 and self.cycle == 1:	
 			self.status.b.vertical_blank = 1
 			if self.ctrl.b.enable_nmi:
 				self.nmi = True
 
+		
+		if self.cycle == 256:
+			...
+
+
 		self.cycle+=1 									# Scan across screen
-		if self.cycle >= 341:	# Finished column
+
+		if self.cycle >= 341:	# Finished columns
 			self.cycle = 0
 			self.scan_line+=1
 
-			if self.scan_line >= 261:	# Finished row
+			if self.scan_line >= 261:	# Finished rows
 				self.scan_line = -1
 
 	# Connect Components
@@ -128,23 +273,23 @@ class PPU:
 			addr &= 0x0FFF	# mirror 4kB
 			if self.v_mirroring:	# Vertical mirroring
 				if addr >= 0x0000 and addr <= 0x03FF:
-					self.name_table[0, addr & 0x3FF] = data
+					self.nametable[0, addr & 0x3FF] = data
 				elif addr >= 0x0400 and addr <= 0x07FF:
-					self.name_table[1, addr & 0x3FF] = data
+					self.nametable[1, addr & 0x3FF] = data
 				elif addr >= 0x0800 and addr <= 0x0BFF:
-					self.name_table[0, addr & 0x3FF] = data
+					self.nametable[0, addr & 0x3FF] = data
 				elif addr >= 0x0C00 and addr <= 0x0FFF:
-					self.name_table[1, addr & 0x3FF] = data
+					self.nametable[1, addr & 0x3FF] = data
 			else:	# Horizontal mirroring
 				if addr >= 0x0000 and addr <= 0x03FF:
-					self.name_table[0, addr & 0x3FF] = data
+					self.nametable[0, addr & 0x3FF] = data
 				elif addr >= 0x0400 and addr <= 0x07FF:
-					self.name_table[0, addr & 0x3FF] = data
+					self.nametable[0, addr & 0x3FF] = data
 				elif addr >= 0x0800 and addr <= 0x0BFF:
-					self.name_table[0, addr & 0x3FF] = data
+					self.nametable[0, addr & 0x3FF] = data
 				elif addr >= 0x0C00 and addr <= 0x0FFF:
-					self.name_table[1, addr & 0x3FF] = data
-					
+					self.nametable[1, addr & 0x3FF] = data
+
 		elif (addr >= 0x3F00) and (addr <= 0x3FFF):		# Palette memory
 			addr &= 0x1F	# address mod 32bytes
 			# Mirrors fg and bg colour palettes
@@ -170,22 +315,22 @@ class PPU:
 			addr &= 0x0FFF	# mirror 4kB
 			if self.v_mirroring:	# Vertical mirroring
 				if addr >= 0x0000 and addr <= 0x03FF:
-					data = self.name_table[0, addr & 0x3FF]
+					data = self.nametable[0, addr & 0x3FF]
 				elif addr >= 0x0400 and addr <= 0x07FF:
-					data = self.name_table[1, addr & 0x3FF]
+					data = self.nametable[1, addr & 0x3FF]
 				elif addr >= 0x0800 and addr <= 0x0BFF:
-					data = self.name_table[0, addr & 0x3FF]
+					data = self.nametable[0, addr & 0x3FF]
 				elif addr >= 0x0C00 and addr <= 0x0FFF:
-					data = self.name_table[1, addr & 0x3FF]
+					data = self.nametable[1, addr & 0x3FF]
 			else:	# Horizontal mirroring
 				if addr >= 0x0000 and addr <= 0x03FF:
-					data = self.name_table[0, addr & 0x3FF]
+					data = self.nametable[0, addr & 0x3FF]
 				elif addr >= 0x0400 and addr <= 0x07FF:
-					data = self.name_table[0, addr & 0x3FF]
+					data = self.nametable[0, addr & 0x3FF]
 				elif addr >= 0x0800 and addr <= 0x0BFF:
-					data = self.name_table[0, addr & 0x3FF]
+					data = self.nametable[0, addr & 0x3FF]
 				elif addr >= 0x0C00 and addr <= 0x0FFF:
-					data = self.name_table[1, addr & 0x3FF]
+					data = self.nametable[1, addr & 0x3FF]
 
 		elif (addr >= 0x3F00) and (addr <= 0x3FFF):		# Palette memory
 			addr &= 0x1F	# address mod 32bytes
@@ -202,6 +347,8 @@ class PPU:
 	def cpu_write(self, addr, data):
 		if addr == 0x0000:			# Control
 			self.ctrl.reg = data
+			self.loopy_t.b.nametable_x = self.ctrl.b.nametable_x
+			self.loopy_t.b.nametable_y = self.ctrl.b.nametable_y
 		elif addr == 0x0001:		# Mask
 			self.mask.reg = data
 		elif addr == 0x0002:		# Status
@@ -211,17 +358,27 @@ class PPU:
 		elif addr == 0x0004:		# OAM Data
 			...
 		elif addr == 0x0005:		# Scroll
-			...
-		elif addr == 0x0006:		# PPU Address
 			if self._address_latch == 0:
-				self.ppu_addr = (self.ppu_addr&0x00FF) | (data<<8)	# Writing high byte
+				self.fine_x = data&0x7	# Lower 3 bits specify pixel
+				self.loopy_t.b.coarse_x = data>>3 	# Upper 5 bits specify tile in nametable, (32x30)
 				self._address_latch = 1
 			else:
-				self.ppu_addr = (self.ppu_addr&0xFF00) | data	# Writing low byte
+				self.loopy_t.b.fine_y = data&0x7	# Lower 3 bits specify pixel
+				self.loopy_t.b.coarse_y = data>>3 	# Upper 5 bits specify y-coord of tile in nametable (30)
 				self._address_latch = 0
+			
+		elif addr == 0x0006:		# PPU Address
+			if self._address_latch == 0:
+				self.loopy_t.reg = (self.loopy_t.reg&0x00FF) | (data<<8)	# Writing high byte
+				self._address_latch = 1
+			else:
+				self.loopy_t.reg = (self.loopy_t.reg&0xFF00) | data	# Writing low byte
+				self.loopy_v.reg = self.loopy_t.reg
+				self._address_latch = 0
+
 		elif addr == 0x0007:		# PPU Data
-			self.ppu_write(self.ppu_addr, data)
-			self.ppu_addr+=1
+			self.ppu_write(self.loopy_v.reg, data)
+			self.loopy_v.reg += (32 if self.ctrl.b.increment_mode else 1)
 
 	def cpu_read(self, addr, bReadOnly: bool = False):
 		data = 0x00
@@ -245,12 +402,12 @@ class PPU:
 			return 0x00 	# Cannot read address register
 		elif addr == 0x0007:		# PPU Data
 			data = self._ppu_data_buffer
-			self._ppu_data_buffer = self.ppu_read(self.ppu_addr)
+			self._ppu_data_buffer = self.ppu_read(self.loopy_v.reg)
 
-			if self.ppu_addr > 0x3F00:					# Palette uses combinatorial logic which can output data in same clock cycle
+			if self.loopy_v.reg > 0x3F00:					# Palette uses combinatorial logic which can output data in same clock cycle
 				data = self._ppu_data_buffer
 
-			self.ppu_addr+=1
+			self.loopy_v.reg += (32 if self.ctrl.b.increment_mode else 1)
 		return data
 
 
