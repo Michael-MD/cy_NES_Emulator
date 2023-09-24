@@ -267,8 +267,8 @@ class CPU6502:
 			self.stkp = (self.stkp + 0xFF) & 0xFF 	# Subtract using 2's complement
 
 			self._addr_abs = 0xFFFE
-			hi = self.read(self._addr_abs)
-			lo = self.read(self._addr_abs + 1)
+			lo = self.read(self._addr_abs)
+			hi = self.read(self._addr_abs + 1)
 			self.pc = (hi<<8) | lo
 
 			self._cycles = 7
@@ -292,8 +292,8 @@ class CPU6502:
 		self.stkp = (self.stkp + 0xFF) & 0xFF 	# Subtract using 2's complement
 
 		self._addr_abs = 0xFFFA
-		hi = self.read(self._addr_abs)
-		lo = self.read(self._addr_abs + 1)
+		lo = self.read(self._addr_abs)
+		hi = self.read(self._addr_abs + 1)
 		self.pc = (hi<<8) | lo
 
 		self._cycles = 8
