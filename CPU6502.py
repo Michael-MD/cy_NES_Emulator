@@ -499,7 +499,7 @@ class CPU6502:
 		return 0
 	
 	def fetch(self):
-		if self.lookup[self.opcode] != self.IMP:
+		if self.lookup[self.opcode].addr_mode != self.IMP:
 			self._fetched = self.read(self._addr_abs)
 
 	# Instruction opcodes
