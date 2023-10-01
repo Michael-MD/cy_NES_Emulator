@@ -3,6 +3,7 @@ import ctypes
 c_uint8 = ctypes.c_uint8
 c_uint16 = ctypes.c_uint16
 from .available_colours import pal_screen
+from .Screen import *
 
 class StatusBits(ctypes.LittleEndianStructure):
     _fields_ = [
@@ -74,6 +75,7 @@ class PPU:
 	def __init__(self):
 		self.bus = None
 		self.cartridge = None
+		self.screen = Screen()
 
 		# Populating screen
 		self.cycle = 0 	# Column
@@ -105,27 +107,46 @@ class PPU:
 
 		self.v_mirroring = None
 
-		# Temporarily store information about next sprite to be rendered.
+		# Temporarily store information about next namespace tile to be rendered.
 		self._bg_next_tile_id = 0x00
 		self._bg_next_tile_attr = 0x00
-		self._bg_next_tile_pixel = 0x0
 		self._bg_next_tile_lsb = 0
 		self._bg_next_tile_msb = 0
+
+		# Shift registers which store pixels to be rendered
+		self._bg_shifter_pattern_lo = 0x0000	# Low bit of pallette offset i.e. pixel color
+		self._bg_shifter_pattern_hi = 0x0000	# High bit of pallette offset i.e. pixel color
+		self._bg_shifter_attr_lo = 0x0000		# Low bit of pallette to use
+		self._bg_shifter_attr_hi = 0x0000		# High bit of pallette to use
+
 
 	def clock(self):
 		# https://www.nesdev.org/w/images/default/4/4f/Ppu.svg
 		
-		if self.scan_line >= -1 and self.scan_line < 240:
+		if self.scan_line >= -1 and self.scan_line < 240:	# Visible region of screen
 			if self.scan_line == -1 and self.cycle == 1:	# Unset vertical blank at top of page
 				self.status.b.vertical_blank = 0
 
-			if (self.cycle >=2 and self.cycle <= 258) or (self.cycle >=321 and self.cycle <= 338):
+			# Prepare next sprite loop, first condition is while screen is being renderd, second is before jumping to top of screen
+			if (self.cycle >=2 and self.cycle < 258) or (self.cycle >=321 and self.cycle < 338):
+				# Shift registers every cycle
+				self._bg_shifter_pattern_lo <<= 1
+				self._bg_shifter_pattern_hi <<= 1
+				self._bg_shifter_attr_lo <<= 1
+				self._bg_shifter_attr_hi <<= 1
+
 				if (self.cycle-1)%8 == 0:	# Read background tile byte from nametable
+					# Place tile data into shift registers for rendering onto screen
+					self._bg_shifter_pattern_lo = (self._bg_shifter_pattern_lo&0xFF00) | self._bg_next_tile_lsb
+					self._bg_shifter_pattern_hi = (self._bg_shifter_pattern_hi&0xFF00) | self._bg_next_tile_msb
+					self._bg_shifter_attr_lo = (self._bg_shifter_attr_lo&0xFF00) | (0xFF if self._bg_next_tile_attr&0b01 else 0x00)
+					self._bg_shifter_attr_hi = (self._bg_shifter_attr_hi&0xFF00) | (0xFF if self._bg_next_tile_attr&0b10 else 0x00)
+
 					"""
 					The loop v register keeps track of which part of the nametable is being shown on screen
 					and the pixel currently being rendered. This is stored in reference coarse y and x and fine y,
 					fine x is stored seperately. To find the offset into the name we:
-					 - offset by the name table and then
+					 - offset by the nametable and then
 					 - offset to current tile.
 					 0x0FFF is 12 bits which is what is required to offset into one of 4 nametables (2bits) and within
 					 a 32x30 grid (10bits). Total: 12bits. The remaining bits are unused.
@@ -161,7 +182,7 @@ class PPU:
 					"""
 					self._bg_next_tile_attr = self.ppu_read((0x2000 + 0x03C0)	
 																| self.loopy_v.b.nametable_y << 11
-																| self.loopy_v.b.nametable_y << 10
+																| self.loopy_v.b.nametable_x << 10
 																| (self.loopy_v.b.coarse_y>>2) << 3
 																| (self.loopy_v.b.coarse_x>>2) << 0
 															)
@@ -180,6 +201,8 @@ class PPU:
 					The code below selects the palette by ensuring the bottom 2 bits are the desired palette.
 					The first if shifts to ensure the correct row is in the bottom 4 bits and the second if statement
 					selects the correct column.
+
+					TODO: elaborate in comment about tile attribute
 					"""
 
 					if self.loopy_v.b.coarse_y&0x2: # Bottom row if > 0
@@ -218,8 +241,8 @@ class PPU:
 
 				elif (self.cycle-1)%8 == 7:	# Increment tile pointer
 					"""
-					Information about pixel has been loaded so we can increment the course x to begin working on the 
-					next pixel.
+					Information about sprite has been loaded so we can increment the course x to begin working on the 
+					next sprite.
 					"""
 					if self.mask.b.render_background or self.mask.b.render_sprites:
 						if self.loopy_v.b.coarse_x == 31:	# Boundary of nametable reached
@@ -236,9 +259,44 @@ class PPU:
 				self.nmi = True
 
 		
-		if self.cycle == 256:
-			...
+		if self.cycle == 256: 	# Increment Y to next row
+			"""
+			A row of spites has been rendered to the screen we need to begin a new line. We collect sprite information
+			in chunks of bytes so we increment course X. However only one row of pixels of the sprite are collected.
+			In other words, we must increment fine y.
+			"""
+			if self.mask.b.render_background or self.mask.b.render_sprites:
+				if self.loopy_v.b.fine_y < 7:
+					self.loopy_v.b.fine_y+=1
+				else:
+					# We have reached the end of a tile, we may need to perform a wrap around
+					self.loopy_v.b.fine_y = 0
 
+					if self.loopy_v.b.coarse_y == 29:
+						"""
+						Boundary of nametable reached, recall y direction only 
+						has 30 tiles, 2 for attribute memory.
+						"""
+						self.loopy_v.b.coarse_y = 0
+						self.loopy_v.b.nametable_y^=1 # Negate nametable bit to increment nametable
+					elif self.loopy_v.b.coarse_y == 31: 	# If in attribute memory					
+						self.loopy_v.b.coarse_y = 0
+					else:	# No wrap arounds so just increment normally
+						self.loopy_v.b.coarse_y+=1
+
+		if self.cycle == 257:
+			"""
+			If we reach edge of screen we need to update the vram register with what is in the tram
+			"""
+			if self.mask.b.render_background or self.mask.b.render_sprites:
+				self.loopy_v.b.nametable_x = self.loopy_t.b.nametable_x
+				self.loopy_v.b.coarse_x = self.loopy_t.b.coarse_x
+
+		if self.scan_line == -1 and self.cycle >= 280 and self.cycle < 305:
+			if self.mask.b.render_background or self.mask.b.render_sprites:
+				self.loopy_v.b.nametable_y = self.loopy_t.b.nametable_y
+				self.loopy_v.b.coarse_y = self.loopy_t.b.coarse_y
+				self.loopy_v.b.fine_y = self.loopy_t.b.fine_y
 
 		self.cycle+=1 									# Scan across screen
 
@@ -248,6 +306,22 @@ class PPU:
 
 			if self.scan_line >= 261:	# Finished rows
 				self.scan_line = -1
+
+		if self.mask.b.render_background:
+			bit_mux = 0x8000 >> self.fine_x
+
+			p0_pixel = (self._bg_shifter_pattern_lo&bit_mux) > 0
+			p1_pixel = (self._bg_shifter_pattern_hi&bit_mux) > 0
+			bg_pixel = (p1_pixel<<1) | p0_pixel
+
+			bg_pal0 = (self._bg_shifter_attr_lo&bit_mux) > 0
+			bg_pal1 = (self._bg_shifter_attr_hi&bit_mux) > 0
+			bg_palette = (bg_pal1<<1) | bg_pal0
+
+			# TODO: Make functon which returns rgb colour and renders on screen
+			c = self.colours[self.ppu_read(0x3F00 + (bg_palette<<2) + bg_pixel)]
+			self.screen(self.scan_line, self.cycle-1, c)
+
 
 	# Connect Components
 	def connect_cartridge(self, cartridge):
@@ -286,7 +360,7 @@ class PPU:
 				elif addr >= 0x0400 and addr <= 0x07FF:
 					self.nametable[0, addr & 0x3FF] = data
 				elif addr >= 0x0800 and addr <= 0x0BFF:
-					self.nametable[0, addr & 0x3FF] = data
+					self.nametable[1, addr & 0x3FF] = data
 				elif addr >= 0x0C00 and addr <= 0x0FFF:
 					self.nametable[1, addr & 0x3FF] = data
 
@@ -328,7 +402,7 @@ class PPU:
 				elif addr >= 0x0400 and addr <= 0x07FF:
 					data = self.nametable[0, addr & 0x3FF]
 				elif addr >= 0x0800 and addr <= 0x0BFF:
-					data = self.nametable[0, addr & 0x3FF]
+					data = self.nametable[1, addr & 0x3FF]
 				elif addr >= 0x0C00 and addr <= 0x0FFF:
 					data = self.nametable[1, addr & 0x3FF]
 
@@ -369,7 +443,7 @@ class PPU:
 			
 		elif addr == 0x0006:		# PPU Address
 			if self._address_latch == 0:
-				self.loopy_t.reg = (self.loopy_t.reg&0x00FF) | (data<<8)	# Writing high byte
+				self.loopy_t.reg = (self.loopy_t.reg&0x00FF) | ((data&0x3F)<<8)	# Writing high byte
 				self._address_latch = 1
 			else:
 				self.loopy_t.reg = (self.loopy_t.reg&0xFF00) | data	# Writing low byte
