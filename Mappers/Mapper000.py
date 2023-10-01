@@ -8,14 +8,14 @@ class Mapper000(Mapper):
 		this is always rejected.
 		"""
 
-		return False
+		return 0x00, False
 
 	def ppu_map_read(self, addr, bReadOnly: bool = False):
 		if addr >= 0x0000 and addr <= 0x1FFF:
 			mapped_addr = addr
-			return mapped_addr
+			return mapped_addr, True
 
-		return False
+		return 0x00, False
 
 	# CPU to mapper communication 
 	def cpu_map_write(self, addr, data):

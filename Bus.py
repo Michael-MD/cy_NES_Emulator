@@ -42,7 +42,7 @@ class Bus:
 			"""
 			...
 		elif addr >= 0x0000 and addr <= 0x1FFF:		# Write to CPU RAM
-			self.cpu_ram[addr & 0x0FFF] = data		# Mirroring 2kB range to fill 8kB
+			self.cpu_ram[addr & 0x07FF] = data		# Mirroring 2kB range to fill 8kB
 		elif addr >= 0x2000 and addr <= 0x3FFF:		# Write to PPU
 			self.ppu.cpu_write(addr & 0x0007, data)		# PPU has 8 registers
 
