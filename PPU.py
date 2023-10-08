@@ -172,7 +172,10 @@ class PPU:
 		self.nmi = False
 
 		# Components attached to PPU bus (pattern memory is implicit since it is contained in the cartridge)
-		self.nametable = np.zeros([2,1024], dtype=np.uint8)	# 2 1kB name tables
+		self.nametable = None	# Defined when mirroring mode is specified
+		self.nametable_a = np.zeros([32,32], dtype=np.uint8)
+		self.nametable_b = np.zeros([32,32], dtype=np.uint8)
+
 		self.palettes = np.zeros(32, dtype=np.uint8)	# 32 bytes
 		self.colours = pal_screen
 
@@ -180,7 +183,7 @@ class PPU:
 		self._sprites_pixels = None
 		self._sprites_colours = None
 
-		self.v_mirroring = None
+		self._v_mirroring = None
 
 		# Temporarily store information about next namespace tile to be rendered.
 		self._bg_next_tile_id = 0x00
@@ -193,6 +196,29 @@ class PPU:
 		self._bg_shifter_pattern_hi = 0x0000	# High bit of pallette offset i.e. pixel color
 		self._bg_shifter_attr_lo = 0x0000		# Low bit of pallette to use
 		self._bg_shifter_attr_hi = 0x0000		# High bit of pallette to use
+
+		self.end_of_frame = False
+
+
+	@property
+	def v_mirroring(self):
+		return self._v_mirroring
+
+	@v_mirroring.setter
+	def v_mirroring(self, v):
+		self._v_mirroring = v
+
+		# Once the mirroring mode has been set we set up the nametable to match
+		if self._v_mirroring:
+			self.nametable = [
+								[self.nametable_a, self.nametable_b],
+								[self.nametable_a, self.nametable_b]
+							]
+		else:
+			self.nametable = [
+								[self.nametable_a, self.nametable_a],
+								[self.nametable_b, self.nametable_b]
+							]
 
 
 	def _load_bg_shifters(self):
@@ -393,6 +419,7 @@ class PPU:
 				self.status.b.vertical_blank = 1
 				if self.ctrl.b.enable_nmi:
 					self.nmi = True
+					self.end_of_frame = True
 
 		bg_pixel = 0
 		bg_palette = 0
@@ -442,24 +469,11 @@ class PPU:
 			The range on the bus is 7kB so we mirror the 4 name tables.
 			"""
 			addr &= 0x0FFF	# mirror 4kB
-			if self.v_mirroring:	# Vertical mirroring
-				if addr >= 0x0000 and addr <= 0x03FF:
-					self.nametable[0, addr & 0x3FF] = data
-				elif addr >= 0x0400 and addr <= 0x07FF:
-					self.nametable[1, addr & 0x3FF] = data
-				elif addr >= 0x0800 and addr <= 0x0BFF:
-					self.nametable[0, addr & 0x3FF] = data
-				elif addr >= 0x0C00 and addr <= 0x0FFF:
-					self.nametable[1, addr & 0x3FF] = data
-			else:	# Horizontal mirroring
-				if addr >= 0x0000 and addr <= 0x03FF:
-					self.nametable[0, addr & 0x3FF] = data
-				elif addr >= 0x0400 and addr <= 0x07FF:
-					self.nametable[0, addr & 0x3FF] = data
-				elif addr >= 0x0800 and addr <= 0x0BFF:
-					self.nametable[1, addr & 0x3FF] = data
-				elif addr >= 0x0C00 and addr <= 0x0FFF:
-					self.nametable[1, addr & 0x3FF] = data
+			NT_y = (addr >> 11) & 0xb1
+			NT_x = (addr >> 10) & 0xb1
+			coarse_y = (addr >> 5) & 0x1F
+			coarse_x = (addr >> 0) & 0x1F
+			self.nametable[NT_y][NT_x][coarse_y, coarse_x] = data
 
 		elif (addr >= 0x3F00) and (addr <= 0x3FFF):		# Palette memory
 			addr &= 0x1F	# address mod 32bytes
@@ -484,24 +498,11 @@ class PPU:
 			The range on the bus is 7kB so we mirror the 4 name tables.
 			"""
 			addr &= 0x0FFF	# mirror 4kB
-			if self.v_mirroring:	# Vertical mirroring
-				if addr >= 0x0000 and addr <= 0x03FF:
-					data = self.nametable[0, addr & 0x3FF]
-				elif addr >= 0x0400 and addr <= 0x07FF:
-					data = self.nametable[1, addr & 0x3FF]
-				elif addr >= 0x0800 and addr <= 0x0BFF:
-					data = self.nametable[0, addr & 0x3FF]
-				elif addr >= 0x0C00 and addr <= 0x0FFF:
-					data = self.nametable[1, addr & 0x3FF]
-			else:	# Horizontal mirroring
-				if addr >= 0x0000 and addr <= 0x03FF:
-					data = self.nametable[0, addr & 0x3FF]
-				elif addr >= 0x0400 and addr <= 0x07FF:
-					data = self.nametable[0, addr & 0x3FF]
-				elif addr >= 0x0800 and addr <= 0x0BFF:
-					data = self.nametable[1, addr & 0x3FF]
-				elif addr >= 0x0C00 and addr <= 0x0FFF:
-					data = self.nametable[1, addr & 0x3FF]
+			NT_y = (addr >> 11) & 0xb1
+			NT_x = (addr >> 10) & 0xb1
+			coarse_y = (addr >> 5) & 0x1F
+			coarse_x = (addr >> 0) & 0x1F
+			data = self.nametable[NT_y][NT_x][coarse_y, coarse_x]
 
 		elif (addr >= 0x3F00) and (addr <= 0x3FFF):		# Palette memory
 			addr &= 0x1F	# address mod 32bytes
