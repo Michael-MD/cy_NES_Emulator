@@ -9,6 +9,10 @@ class Bus:
 
 		self.n_system_clock_counter = 0
 
+		# Controller state
+		self.controller = np.zeros(2, dtype=np.uint8)	# Keeps track of controller
+		self.controller_state = np.zeros(2, dtype=np.uint8)	# Latches controlller state after CPU write
+
 	def clock(self):
 		self.ppu.clock()
 		if self.n_system_clock_counter % 3 == 0:	# PPU clock 3x faster than CPU
@@ -45,6 +49,8 @@ class Bus:
 			self.cpu_ram[addr & 0x07FF] = data		# Mirroring 2kB range to fill 8kB
 		elif addr >= 0x2000 and addr <= 0x3FFF:		# Write to PPU
 			self.ppu.cpu_write(addr & 0x0007, data)		# PPU has 8 registers
+		elif addr == 0x4016 or addr == 0x4017:		# Controller Memory mapped IO
+			self.controller_state[addr&0x0001] = self.controller[addr&0x0001]&0xFF
 
 	def read(self, addr: np.uint16, bReadOnly: bool = False):
 		data, valid_addr = self.cartridge.cpu_read(addr, bReadOnly)
@@ -54,4 +60,10 @@ class Bus:
 			return self.cpu_ram[addr & 0x07FF]	# Maps 8kB addressable memory to 2kB of physical memory (mirroring)
 		elif addr >= 0x2000 and addr <= 0x3FFF:		# Read from PPU
 			return self.ppu.cpu_read(addr & 0x0007, bReadOnly)	# PPU has 8 registers
+		elif addr == 0x4016 or addr == 0x4017:		# Controller Memory mapped IO
+			data = (self.controller_state[addr&0x0001] & 0x80) > 0
+			self.controller_state[addr&0x0001] <<= 1
+			return data
+
+
 		return 0x00

@@ -51,6 +51,8 @@ class NES:
 
 		if self.n_mapper_ID == 0:
 			mapper = Mapper000
+		else:
+			raise Exception('Unsupported mapper.')
 		
 		self.cart.connect_mapper(
 			mapper(n_prog_chunks, n_char_chunks)

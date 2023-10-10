@@ -199,7 +199,6 @@ class PPU:
 
 		self.end_of_frame = False
 
-
 	@property
 	def v_mirroring(self):
 		return self._v_mirroring
@@ -417,9 +416,9 @@ class PPU:
 			# Set vertical blank at scan line below bottom of page and set nmi i.e. emit interrupt
 			if self.scan_line == 241 and self.cycle == 1:	
 				self.status.b.vertical_blank = 1
+				self.end_of_frame = True
 				if self.ctrl.b.enable_nmi:
 					self.nmi = True
-					self.end_of_frame = True
 
 		bg_pixel = 0
 		bg_palette = 0
