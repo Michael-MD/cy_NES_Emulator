@@ -8,20 +8,6 @@ cdef extern from "stdint.h":
 
 from libcpp cimport bool
 
-""" 
-Masks to be used for easily accessing individual bits of 
-the cpu's status register.
-"""
-class flags(Enum):
-	C = (1 << 0)	# Carry
-	Z = (1 << 1)	# Zero
-	I = (1 << 2)	# Interrupt disable
-	D = (1 << 3)	# Decimal mode
-	B = (1 << 4)	# Break
-	U = (1 << 5)	# Unused
-	V = (1 << 6)	# Overflow
-	N = (1 << 7)	# Negative
-
 class Instruction:
 	def __init__(self, name: str, opcode, addr_mode, cycles: int):
 		self.name = name
@@ -55,6 +41,15 @@ cdef class CPU6502:
 	cdef uint8_t _cycles
 	cdef object lookup
 	cdef object instruction
+
+	cdef uint8_t C
+	cdef uint8_t Z
+	cdef uint8_t I
+	cdef uint8_t D
+	cdef uint8_t B
+	cdef uint8_t U
+	cdef uint8_t V
+	cdef uint8_t N
 
 	def __cinit__(self):
 		self.a = 0x00 		# Accumulator Register
@@ -231,6 +226,19 @@ cdef class CPU6502:
 		self.lookup[0xFD] = Instruction('SBC', opcode=self.SBC, addr_mode=self.ABX, cycles=4)
 		self.lookup[0xFE] = Instruction('INC', opcode=self.INC, addr_mode=self.ABX, cycles=7)
 
+		""" 
+		Masks to be used for easily accessing individual bits of 
+		the cpu's status register.
+		"""
+		self.C = (1 << 0)	# Carry
+		self.Z = (1 << 1)	# Zero
+		self.I = (1 << 2)	# Interrupt disable
+		self.D = (1 << 3)	# Decimal mode
+		self.B = (1 << 4)	# Break
+		self.U = (1 << 5)	# Unused
+		self.V = (1 << 6)	# Overflow
+		self.N = (1 << 7)	# Negative
+
 	@property
 	def cycles(self):
 		return self._cycles
@@ -258,13 +266,13 @@ cdef class CPU6502:
 		return self.bus.read(addr)
 
 	def get_flag(self, f):
-		return self.status & f.value
+		return self.status & f
 
 	def set_flag(self, f, v):
 		if v:
-			self.status |= f.value
+			self.status |= f
 		else:
-			self.status &= ~f.value
+			self.status &= ~f
 
 	def set_irq(self, v):
 		self._interrupt = True if v else False
@@ -292,7 +300,7 @@ cdef class CPU6502:
 
 	# Servicing maskable interrupts
 	def irq(self):
-		if self.get_flag(flags.I) == 0:	# Interrupts allowed
+		if self.get_flag(self.I) == 0:	# Interrupts allowed
 			self.write(0x100 + self.stkp, (self.pc>>8) & 0xFF)	# Store high byte
 			# self.stkp-=1
 			self.stkp = (self.stkp + 0xFF) & 0xFF 	# Subtract using 2's complement
@@ -325,12 +333,12 @@ cdef class CPU6502:
 		# self.stkp-=1
 		self.stkp = (self.stkp + 0xFF) & 0xFF 	# Subtract using 2's complement
 
-		self.set_flag(flags.B, 0)
-		self.set_flag(flags.U, 1)
-		self.set_flag(flags.I, 1)	# Cannot interrupt while servicing interrupt
+		self.set_flag(self.B, 0)
+		self.set_flag(self.U, 1)
+		self.set_flag(self.I, 1)	# Cannot interrupt while servicing interrupt
 
 		# Store status registor in stack
-		self.write(0x100 + self.stkp, (self.status&0xFF) | flags.B.value | flags.U.value)		# Store low byte
+		self.write(0x100 + self.stkp, (self.status&0xFF) | self.B | self.U)		# Store low byte
 		# self.stkp-=1
 		self.stkp = (self.stkp + 0xFF) & 0xFF 	# Subtract using 2's complement
 
@@ -372,7 +380,7 @@ cdef class CPU6502:
 			self._cycles += (additional_clock_cycle_1 & additional_clock_cycle_2)
 
 			# Always set unused flag
-			self.set_flag(flags.U, 1)
+			self.set_flag(self.U, 1)
 
 		else:
 			self._cycles-=1
@@ -553,11 +561,11 @@ cdef class CPU6502:
 	"""
 	def ADC(self):
 		self.fetch()
-		temp = self.a + self._fetched + self.get_flag(flags.C)
-		self.set_flag(flags.C, temp > 255)
-		self.set_flag(flags.Z, (temp&0xFF) == 0x00)
-		self.set_flag(flags.N, temp & 0x80)
-		self.set_flag(flags.V, (((self.a ^ self._fetched)^0xFF) & (self.a ^ temp)) & 0x80 )
+		temp = self.a + self._fetched + self.get_flag(self.C)
+		self.set_flag(self.C, temp > 255)
+		self.set_flag(self.Z, (temp&0xFF) == 0x00)
+		self.set_flag(self.N, temp & 0x80)
+		self.set_flag(self.V, (((self.a ^ self._fetched)^0xFF) & (self.a ^ temp)) & 0x80 )
 		self.a = temp&0xFF
 
 		return 1
@@ -565,26 +573,26 @@ cdef class CPU6502:
 	"""
 	AND - Second byte is data, "AND" with data in memory with accumulator.
 	A and M -> A
-	Flags: N, Z
+	self: N, Z
 	"""
 	def AND(self):
 		self.fetch()
 		self.a &= (self._fetched&0xFF)
-		self.set_flag(flags.Z, self.a == 0x00)	# Set zero flag
-		self.set_flag(flags.N, self.a & 0x80)	# Set negative flag
+		self.set_flag(self.Z, self.a == 0x00)	# Set zero flag
+		self.set_flag(self.N, self.a & 0x80)	# Set negative flag
 		return 1
 
 	"""
 	ASL - Arithmetic shift left. 
 	C <- /M7...M0/ <- 0
-	Flags: C, Z, N
+	self: C, Z, N
 	"""
 	def ASL(self):
 		self.fetch()
 		temp = self._fetched << 1
-		self.set_flag(flags.C, temp & 0xFF00)
-		self.set_flag(flags.Z, (temp&0xFF) == 0x00)
-		self.set_flag(flags.N, temp&0x80)
+		self.set_flag(self.C, temp & 0xFF00)
+		self.set_flag(self.Z, (temp&0xFF) == 0x00)
+		self.set_flag(self.N, temp&0x80)
 
 		# If addressing mode implicit then accumulator is changed, otherwise the result is written to memory
 		if self.lookup[self._opcode].addr_mode == self.IMP:
@@ -599,10 +607,10 @@ cdef class CPU6502:
 	Only has relative addressing mode.
 	Requires addition clock cycle if branch taken. 
 	Require additional clock cycle if page boundary crossed.
-	Flags: -
+	self: -
 	"""
 	def BCC(self):
-		if self.get_flag(flags.C) == 0:
+		if self.get_flag(self.C) == 0:
 			self._cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
 
@@ -618,10 +626,10 @@ cdef class CPU6502:
 	Only has relative addressing mode.
 	Requires addition clock cycle if branch taken. 
 	Require additional clock cycle if page boundary crossed.
-	Flags: -
+	self: -
 	"""
 	def BCS(self):
-		if self.get_flag(flags.C):
+		if self.get_flag(self.C):
 			self._cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
 
@@ -638,10 +646,10 @@ cdef class CPU6502:
 	Asbolute branching address set by relative distance from pc.
 	Requires addition clock cycle if branch occurs. 
 	Require additional clock cycle if page boundary crossed.
-	Flags: -
+	self: -
 	"""
 	def BEQ(self):
-		if self.get_flag(flags.Z):
+		if self.get_flag(self.Z):
 			self._cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
 
@@ -656,23 +664,23 @@ cdef class CPU6502:
 	"""
 	BIT - Test bits in memory with accumulator.
 	A and M
-	Flags: N, V
+	self: N, V
 	"""
 	def BIT(self):
 		self.fetch()
 		temp = self.a & self._fetched
-		self.set_flag(flags.Z, temp == 0x00)	# Set zero flag
-		self.set_flag(flags.N, self._fetched & 0x80)		# Set negative flag
-		self.set_flag(flags.V, self._fetched & 0x40)		# Set overflow flag
+		self.set_flag(self.Z, temp == 0x00)	# Set zero flag
+		self.set_flag(self.N, self._fetched & 0x80)		# Set negative flag
+		self.set_flag(self.V, self._fetched & 0x40)		# Set overflow flag
 
 		return 0
 
 	"""
 	BMI - Branch on result minus.
-	Flags: -
+	self: -
 	"""
 	def BMI(self):
-		if self.get_flag(flags.N):
+		if self.get_flag(self.N):
 			self._cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
 
@@ -685,10 +693,10 @@ cdef class CPU6502:
 
 	"""
 	BNE - Branch on result not zero (Branch on Not Equal)
-	Flags: -
+	self: -
 	"""
 	def BNE(self):
-		if self.get_flag(flags.Z) == 0:
+		if self.get_flag(self.Z) == 0:
 			self._cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
 
@@ -701,10 +709,10 @@ cdef class CPU6502:
 
 	"""
 	BPL - Branch on Result Plus
-	Flags: -
+	self: -
 	"""
 	def BPL(self):
-		if self.get_flag(flags.N) == 0:
+		if self.get_flag(self.N) == 0:
 			self._cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
 
@@ -718,7 +726,7 @@ cdef class CPU6502:
 	"""
 	BRK - Break Command
 	Pushes program counter and status register on stack in preparation for interript vector.
-	Flags: I <- 1
+	self: I <- 1
 	"""
 	def BRK(self):
 		self.write(0x100 + self.stkp, (self.pc>>8) & 0xFF)	# Store high byte
@@ -728,10 +736,10 @@ cdef class CPU6502:
 		# self.stkp-=1
 		self.stkp = (self.stkp + 0xFF) & 0xFF 	# Subtract using 2's complement
 
-		self.set_flag(flags.I, 1)
+		self.set_flag(self.I, 1)
 
 		# Store status registor in stack
-		self.write(0x100 + self.stkp, (self.status&0xFF) | flags.B.value | flags.U.value)		# Store low byte
+		self.write(0x100 + self.stkp, (self.status&0xFF) | self.B | self.U)		# Store low byte
 		# self.stkp-=1
 		self.stkp = (self.stkp + 0xFF) & 0xFF 	# Subtract using 2's complement
 
@@ -744,10 +752,10 @@ cdef class CPU6502:
 
 	"""
 	BVC - Branch on Overflow Clear
-	Flags: -
+	self: -
 	"""
 	def BVC(self):
-		if self.get_flag(flags.V) == 0:
+		if self.get_flag(self.V) == 0:
 			self._cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
 
@@ -760,10 +768,10 @@ cdef class CPU6502:
 
 	"""
 	BVS - Branch on Overflow Set
-	Flags: -
+	self: -
 	"""
 	def BVS(self):
-		if self.get_flag(flags.V):
+		if self.get_flag(self.V):
 			self._cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
 
@@ -777,171 +785,171 @@ cdef class CPU6502:
 	"""
 	CLC - Clears carry flag
 	C <- 0
-	Flags: C <- 0
+	self: C <- 0
 	"""
 	def CLC(self):
-		self.set_flag(flags.C, 0)
+		self.set_flag(self.C, 0)
 		return 0
 
 	"""
 	CLD - Clear decimal mode
 	D <- 0
-	Flags: D <- 0
+	self: D <- 0
 	"""
 	def CLD(self):
-		self.set_flag(flags.D, 0)
+		self.set_flag(self.D, 0)
 		return 0
 
 	"""
 	CID - Clear interrupt disable bit
 	I <- 0
-	Flags: I <- 0
+	self: I <- 0
 	"""
 	def CLI(self):
-		self.set_flag(flags.I, 0)
+		self.set_flag(self.I, 0)
 		return 0
 
 	"""
 	CLV - Clear overflow flag
 	V <- 0
-	Flags: V <- 0
+	self: V <- 0
 	"""
 	def CLV(self):
-		self.set_flag(flags.V, 0)
+		self.set_flag(self.V, 0)
 		return 0
 
 	"""
 	CMP - Compares accumulator with memory. 
 	A-M 
-	Flags: C, Z, N
+	self: C, Z, N
 	"""
 	def CMP(self):
 		self.fetch()
 		temp = self.a - self._fetched
-		self.set_flag(flags.C, self.a >= self._fetched)
-		self.set_flag(flags.Z, (temp&0xFF) == 0x00)
-		self.set_flag(flags.N, temp & 0x80)
+		self.set_flag(self.C, self.a >= self._fetched)
+		self.set_flag(self.Z, (temp&0xFF) == 0x00)
+		self.set_flag(self.N, temp & 0x80)
 		return 1
 
 	"""
 	CPX  - Compares X register with memory location
 	X-M 
-	Flags: C, Z, N
+	self: C, Z, N
 	"""
 	def CPX(self):
 		self.fetch()
 		temp = self.x - self._fetched
-		self.set_flag(flags.C, self.x >= self._fetched)
-		self.set_flag(flags.Z, (temp&0xFF) == 0x00)
-		self.set_flag(flags.N, temp & 0x80)
+		self.set_flag(self.C, self.x >= self._fetched)
+		self.set_flag(self.Z, (temp&0xFF) == 0x00)
+		self.set_flag(self.N, temp & 0x80)
 		return 0
 	
 	"""
 	CPY  - Compares Y register with memory location
 	Y-M 
-	Flags: C, Z, N
+	self: C, Z, N
 	"""	
 	def CPY(self):
 		self.fetch()
 		temp = self.y - self._fetched
-		self.set_flag(flags.C, self.y >= self._fetched)
-		self.set_flag(flags.Z, (temp&0xFF) == 0x00)
-		self.set_flag(flags.N, temp & 0x80)
+		self.set_flag(self.C, self.y >= self._fetched)
+		self.set_flag(self.Z, (temp&0xFF) == 0x00)
+		self.set_flag(self.N, temp & 0x80)
 		return 0
 	
 	"""
 	DEC - Decrement Memory By One
 	M <- M-1
-	Flags: N, Z
+	self: N, Z
 	"""
 	def DEC(self):
 		self.fetch()
 		temp = self._fetched - 1
-		self.set_flag(flags.Z, (temp&0xFF) == 0)
-		self.set_flag(flags.N, temp & 0x80)
+		self.set_flag(self.Z, (temp&0xFF) == 0)
+		self.set_flag(self.N, temp & 0x80)
 		self.write(self._addr_abs, temp&0xFF)
 		return 0
 
 	"""
 	DEX - Decrement Index Register X By One
 	X <- X-1
-	Flags: N, Z
+	self: N, Z
 	"""
 	def DEX(self):
 		self.x-=1
 		self.x&=0xFF
-		self.set_flag(flags.Z, self.x == 0)
-		self.set_flag(flags.N, self.x & 0x80)
+		self.set_flag(self.Z, self.x == 0)
+		self.set_flag(self.N, self.x & 0x80)
 		return 0
 
 	"""
 	DEY - Decrement Index Register Y By One
 	Y <- Y-1
-	Flags: N, Z
+	self: N, Z
 	"""
 	def DEY(self):
 		self.y-=1
 		self.y&=0xFF
-		self.set_flag(flags.Z, self.y == 0)
-		self.set_flag(flags.N, self.y & 0x80)
+		self.set_flag(self.Z, self.y == 0)
+		self.set_flag(self.N, self.y & 0x80)
 		return 0
 
 	"""
 	EOR - "Exclusive OR" Memory with Accumulator
 	A <- A ^ M
-	Flags: N, Z
+	self: N, Z
 	"""
 	def EOR(self):
 		self.fetch()
 		temp = self._fetched ^ self.a
 		self.a = 0xFF & temp
-		self.set_flag(flags.Z, self.a == 0)
-		self.set_flag(flags.N, self.a & 0x80)
+		self.set_flag(self.Z, self.a == 0)
+		self.set_flag(self.N, self.a & 0x80)
 		return 1
 
 	"""
 	INC - Increment Memory By One
 	M <- M+1
-	Flags: N, Z
+	self: N, Z
 	"""
 	def INC(self):
 		self.fetch()
 		temp = self._fetched + 1
 		temp&=0xFF
 		self.write(self._addr_abs, temp)
-		self.set_flag(flags.Z, temp == 0)
-		self.set_flag(flags.N, temp&0x80)
+		self.set_flag(self.Z, temp == 0)
+		self.set_flag(self.N, temp&0x80)
 		return 0
 
 	"""
 	INX - Increment Index Register X By One
 	X <- X+1
-	Flags: N, Z
+	self: N, Z
 	"""
 	def INX(self):
 		self.x+=1
 		self.x&=0xFF
-		self.set_flag(flags.Z, self.x == 0)
-		self.set_flag(flags.N, self.x&0x80)
+		self.set_flag(self.Z, self.x == 0)
+		self.set_flag(self.N, self.x&0x80)
 		return 0
 
 	"""
 	INY - Increment Index Register Y By One
 	Y <- Y+1
-	Flags: N, Z
+	self: N, Z
 	"""
 	def INY(self):
 		self.y+=1
 		self.y&=0xFF
-		self.set_flag(flags.Z, self.y == 0)
-		self.set_flag(flags.N, self.y&0x80)
+		self.set_flag(self.Z, self.y == 0)
+		self.set_flag(self.N, self.y&0x80)
 		return 0
 
 	"""
 	JMP - JMP Indirect
 	Jumps to new location without pushing old pc to stack
 	[PC + 1] → PCL, [PC + 2] → PCH
-	Flags: -
+	self: -
 	"""
 	def JMP(self):
 		self.pc = self._addr_abs
@@ -951,7 +959,7 @@ cdef class CPU6502:
 	JSR - Jump To Subroutine
 	Jumps to new location after pushing old pc to stack
 	PC + 2↓, [PC + 1] → PCL, [PC + 2] → PCH
-	Flags: -
+	self: -
 	"""
 	def JSR(self):
 		self.pc-=1
@@ -969,48 +977,48 @@ cdef class CPU6502:
 	"""
 	LDA - Load Accumulator with Memory
 	A <- M
-	Flags: N, Z
+	self: N, Z
 	"""
 	def LDA(self):
 		self.fetch()
 		self.a = self._fetched & 0xFF
-		self.set_flag(flags.Z, self.a == 0)
-		self.set_flag(flags.N, self.a & 0x80)
+		self.set_flag(self.Z, self.a == 0)
+		self.set_flag(self.N, self.a & 0x80)
 
 		return 1
 
 	"""
 	LDX - Load Accumulator with Memory
 	X <- M
-	Flags: N, Z
+	self: N, Z
 	"""
 	def LDX(self):
 		self.fetch()
 		self.x = self._fetched & 0xFF
-		self.set_flag(flags.Z, self.x == 0)
-		self.set_flag(flags.N, self.x & 0x80)
+		self.set_flag(self.Z, self.x == 0)
+		self.set_flag(self.N, self.x & 0x80)
 		return 1
 
 	"""
 	LDY - Load Accumulator with Memory
 	Y <- M
-	Flags: N, Z
+	self: N, Z
 	"""
 	def LDY(self):
 		self.fetch()
 		self.y = self._fetched & 0xFF
-		self.set_flag(flags.Z, self.y == 0)
-		self.set_flag(flags.N, self.y & 0x80)
+		self.set_flag(self.Z, self.y == 0)
+		self.set_flag(self.N, self.y & 0x80)
 		return 1
 
 	"""
 	LSR - Logical Shift Right
 	0 → /M7...M0/ → C
-	Flags: N, Z, C
+	self: N, Z, C
 	"""
 	def LSR(self):
 		self.fetch()
-		self.set_flag(flags.C, self._fetched & 0x01)
+		self.set_flag(self.C, self._fetched & 0x01)
 		self._fetched >>= 1
 
 		if self.lookup[self._opcode].addr_mode == self.IMP:
@@ -1018,8 +1026,8 @@ cdef class CPU6502:
 		else:
 			self.write(self._addr_abs, self._fetched)
 			
-		self.set_flag(flags.Z, self._fetched == 0)
-		self.set_flag(flags.N, self._fetched & 0x80)
+		self.set_flag(self.Z, self._fetched == 0)
+		self.set_flag(self.N, self._fetched & 0x80)
 		return 0
 
 
@@ -1032,19 +1040,19 @@ cdef class CPU6502:
 	"""
 	ORA - "OR" Memory with Accumulator
 	A ∨ M → A
-	Flags: -
+	self: -
 	"""
 	def ORA(self):
 		self.fetch()
 		self.a = (self.a&0xFF) | (self._fetched&0xFF)
-		self.set_flag(flags.N, self.a & 0x80)
-		self.set_flag(flags.Z, self.a == 0)
+		self.set_flag(self.N, self.a & 0x80)
+		self.set_flag(self.Z, self.a == 0)
 		return 1
 
 	"""
 	PHA - Push Accumulator On Stack
 	A↓
-	Flags: -
+	self: -
 	"""
 	def PHA(self):
 		self.write(0x100 + self.stkp, self.a & 0xFF)		# Store low byte
@@ -1055,12 +1063,12 @@ cdef class CPU6502:
 	"""
 	PHP - Push Processor Status On Stack
 	P↓
-	Flags: -
+	self: -
 	"""
 	def PHP(self):
-		self.write(0x100 + self.stkp, (self.status & 0xFF) | flags.B.value | flags.U.value)		# Store low byte
-		self.set_flag(flags.B, 0)
-		self.set_flag(flags.U, 0)
+		self.write(0x100 + self.stkp, (self.status & 0xFF) | self.B | self.U)		# Store low byte
+		self.set_flag(self.B, 0)
+		self.set_flag(self.U, 0)
 		# self.stkp-=1
 		self.stkp = (self.stkp + 0xFF) & 0xFF 	# Subtract using 2's complement
 		return 0
@@ -1068,42 +1076,42 @@ cdef class CPU6502:
 	"""
 	PLA - Pull Accumulator From Stack
 	A↑
-	Flags: N, Z
+	self: N, Z
 	"""
 	def PLA(self):
 		# self.stkp+=1
 		self.stkp = (self.stkp+1)&0xFF
 		self.a = self.read(0x100 + self.stkp)		# Store low byte
-		self.set_flag(flags.Z, self.a==0)
-		self.set_flag(flags.N, self.a&0x80)
+		self.set_flag(self.Z, self.a==0)
+		self.set_flag(self.N, self.a&0x80)
 		return 0
 
 	"""
 	PLP - Pull Processor Status From Stack
 	P↑
-	Flags: N, V, D, I, Z, C
+	self: N, V, D, I, Z, C
 	"""
 	def PLP(self):
 		# self.stkp+=1
 		self.stkp = (self.stkp+1)&0xFF
 		self.status = self.read(0x100 + self.stkp)		# Store low byte
-		self.set_flag(flags.U, 1) 	# Ensure reserved/unused flag set
+		self.set_flag(self.U, 1) 	# Ensure reserved/unused flag set
 		return 0
 
 	"""
 	ROL - Rotate Left
 	C ← /M7...M0/ ← C
-	Flags: N, Z, C
+	self: N, Z, C
 	"""
 	def ROL(self):
 		self.fetch()
 		self._fetched <<= 1
-		self._fetched |= self.get_flag(flags.C)
+		self._fetched |= self.get_flag(self.C)
 
-		self.set_flag(flags.C, self._fetched & 0x100)
+		self.set_flag(self.C, self._fetched & 0x100)
 		self._fetched &= 0xFF
-		self.set_flag(flags.Z, self._fetched == 0)
-		self.set_flag(flags.N, self._fetched & 0x80)
+		self.set_flag(self.Z, self._fetched == 0)
+		self.set_flag(self.N, self._fetched & 0x80)
 
 		if self.lookup[self._opcode].addr_mode == self.IMP:
 			self.a = self._fetched
@@ -1115,18 +1123,18 @@ cdef class CPU6502:
 	"""
 	ROR - Rotate Right
 	C → /M7...M0/ → C
-	Flags: N, Z, C
+	self: N, Z, C
 	"""
 	def ROR(self):
 		self.fetch()
 		temp = self._fetched & 0x01
 		self._fetched >>= 1
-		self._fetched |= (self.get_flag(flags.C)<<7)
-		self.set_flag(flags.C, temp)
+		self._fetched |= (self.get_flag(self.C)<<7)
+		self.set_flag(self.C, temp)
 
 		self._fetched &= 0xFF
-		self.set_flag(flags.Z, self._fetched == 0)
-		self.set_flag(flags.N, self._fetched & 0x80)
+		self.set_flag(self.Z, self._fetched == 0)
+		self.set_flag(self.N, self._fetched & 0x80)
 
 		if self.lookup[self._opcode].addr_mode == self.IMP:
 			self.a = self._fetched
@@ -1139,13 +1147,13 @@ cdef class CPU6502:
 	RTI - Return From Interrupt
 	Called at the end of interrupt vector to restore cpu state
 	P↑ PC↑
-	Flags: N, V, D, I, Z, C
+	self: N, V, D, I, Z, C
 	"""
 	def RTI(self):
 		# self.stkp+=1
 		self.stkp = (self.stkp+1)&0xFF
 		self.status = self.read(0x100 + self.stkp)
-		self.set_flag(flags.U, 1) 	# Ensure reserved/unused flag set
+		self.set_flag(self.U, 1) 	# Ensure reserved/unused flag set
 
 		# self.stkp+=1
 		self.stkp = (self.stkp+1)&0xFF
@@ -1162,7 +1170,7 @@ cdef class CPU6502:
 	RTS - Return From Subroutme
 	Restor pc from JSR instruction
 	PC↑, PC + 1 → PC
-	Flags: -
+	self: -
 	"""
 	def RTS(self):
 		self.stkp = (self.stkp+1)&0xFF
@@ -1177,16 +1185,16 @@ cdef class CPU6502:
 	"""
 	SBC - Subtract Memory from Accumulator with Borrow
 	A - M - ~C → A
-	Flags: N, V, Z, C
+	self: N, V, Z, C
 	"""
 	def SBC(self):
 		self.fetch()
 		value = (self._fetched^0xFF) & 0xFF
-		temp = self.a + value + self.get_flag(flags.C)
-		self.set_flag(flags.C, temp & 0xFF00)
-		self.set_flag(flags.Z, (temp&0xFF) == 0x00)
-		self.set_flag(flags.N, temp & 0x80)
-		self.set_flag(flags.V, (temp ^ self.a) & (temp ^ value) & 0x0080)
+		temp = self.a + value + self.get_flag(self.C)
+		self.set_flag(self.C, temp & 0xFF00)
+		self.set_flag(self.Z, (temp&0xFF) == 0x00)
+		self.set_flag(self.N, temp & 0x80)
+		self.set_flag(self.V, (temp ^ self.a) & (temp ^ value) & 0x0080)
 		self.a = temp&0xFF
 
 		return 1
@@ -1194,34 +1202,34 @@ cdef class CPU6502:
 	"""
 	SEC - Set Carry Flag
 	1 → C
-	Flags: C <- 1
+	self: C <- 1
 	"""
 	def SEC(self):
-		self.set_flag(flags.C, 1)
+		self.set_flag(self.C, 1)
 		return 0
 
 	"""
 	SEC - Set Decimal Mode
 	1 → D
-	Flags: D <- 1
+	self: D <- 1
 	"""
 	def SED(self):
-		self.set_flag(flags.D, 1)
+		self.set_flag(self.D, 1)
 		return 0
 
 	"""
 	SEC - Set Interrupt Disable
 	1 → I
-	Flags: I <- 1
+	self: I <- 1
 	"""
 	def SEI(self):
-		self.set_flag(flags.I, 1)
+		self.set_flag(self.I, 1)
 		return 0
 
 	"""
 	STA - Store Accumulator in Memory
 	A → M
-	Flags: -
+	self: -
 	"""
 	def STA(self):
 		self.write(self._addr_abs, self.a)
@@ -1230,7 +1238,7 @@ cdef class CPU6502:
 	"""
 	STX - Store Index Register X In Memory
 	X → M
-	Flags: -
+	self: -
 	"""
 	def STX(self):
 		self.write(self._addr_abs, self.x)
@@ -1239,7 +1247,7 @@ cdef class CPU6502:
 	"""
 	STY - Store Index Register Y In Memory
 	Y → M
-	Flags: -
+	self: -
 	"""
 	def STY(self):
 		self.write(self._addr_abs, self.y)
@@ -1248,60 +1256,60 @@ cdef class CPU6502:
 	"""
 	STZ - Store Zero Flag in Memory
 	Z → M
-	Flags: -
+	self: -
 	"""
 	def STZ(self):
-		self.write(self._addr_abs, flags.Z)
+		self.write(self._addr_abs, self.Z)
 		return 0
 
 	"""
 	TAX - Transfer Accumulator To Index X
 	A → X
-	Flags: N, Z
+	self: N, Z
 	"""
 	def TAX(self):
 		self.x = self.a
-		self.set_flag(flags.N, self.x & 0x80)
-		self.set_flag(flags.Z, self.x == 0)
+		self.set_flag(self.N, self.x & 0x80)
+		self.set_flag(self.Z, self.x == 0)
 		return 0
 
 	"""
 	TAY - Transfer Accumulator To Index Y
 	A → Y
-	Flags: N, Z
+	self: N, Z
 	"""
 	def TAY(self):
 		self.y = self.a
-		self.set_flag(flags.N, self.y & 0x80)
-		self.set_flag(flags.Z, self.y == 0)
+		self.set_flag(self.N, self.y & 0x80)
+		self.set_flag(self.Z, self.y == 0)
 		return 0
 
 	"""
 	TSX - Transfer Stack Pointer To Index X
 	S → X
-	Flags: N, Z
+	self: N, Z
 	"""
 	def TSX(self):
 		self.x = self.stkp
-		self.set_flag(flags.N, self.x & 0x80)
-		self.set_flag(flags.Z, self.x == 0)
+		self.set_flag(self.N, self.x & 0x80)
+		self.set_flag(self.Z, self.x == 0)
 		return 0
 
 	"""
 	TXA - Transfer Index X To Accumulator
 	X → A
-	Flags: N, Z
+	self: N, Z
 	"""
 	def TXA(self):
 		self.a = self.x
-		self.set_flag(flags.N, self.a & 0x80)
-		self.set_flag(flags.Z, self.a == 0)
+		self.set_flag(self.N, self.a & 0x80)
+		self.set_flag(self.Z, self.a == 0)
 		return 0
 
 	"""
 	TXS - Transfer Index X To Stack Pointer
 	X → S
-	Flags: N, Z
+	self: N, Z
 	"""
 	def TXS(self):
 		self.stkp = self.x & 0xFF
@@ -1310,12 +1318,12 @@ cdef class CPU6502:
 	"""
 	TYA - Transfer Index Y To Accumulator
 	Y → A
-	Flags: N, Z
+	self: N, Z
 	"""
 	def TYA(self):
 		self.a = self.y
-		self.set_flag(flags.N, self.a & 0x80)
-		self.set_flag(flags.Z, self.a == 0)
+		self.set_flag(self.N, self.a & 0x80)
+		self.set_flag(self.Z, self.a == 0)
 		return 0
 
 	# Invalid instruction
