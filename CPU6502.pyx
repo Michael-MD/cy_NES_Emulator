@@ -33,7 +33,7 @@ cdef class CPU6502:
 	
 	cdef object bus
 	
-	cdef uint8_t _fetched
+	cdef uint16_t _fetched
 	cdef uint16_t _addr_abs
 	cdef uint16_t _addr_rel
 	cdef uint8_t _opcode
