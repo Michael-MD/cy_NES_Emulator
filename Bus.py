@@ -31,7 +31,7 @@ class Bus:
 
 	def connect_ppu(self, ppu):
 		self.ppu = ppu
-		self.ppu.connect_bus(self)
+		# self.ppu.connect_bus(self)
 
 	def connect_cartridge(self, cartridge):
 		self.cartridge = cartridge
@@ -59,7 +59,7 @@ class Bus:
 		elif addr >= 0x0000 and addr <= 0x1FFF:		# Read from CPU RAM
 			return self.cpu_ram[addr & 0x07FF]	# Maps 8kB addressable memory to 2kB of physical memory (mirroring)
 		elif addr >= 0x2000 and addr <= 0x3FFF:		# Read from PPU
-			return self.ppu.cpu_read(addr & 0x0007, bReadOnly)	# PPU has 8 registers
+			return self.ppu.cpu_read(addr & 0x0007)	# PPU has 8 registers
 		elif addr == 0x4016 or addr == 0x4017:		# Controller Memory mapped IO
 			data = (self.controller_state[addr&0x0001] & 0x80) > 0
 			self.controller_state[addr&0x0001] <<= 1

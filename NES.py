@@ -83,7 +83,7 @@ class NES:
 
 		# Reset everything
 		self.reset()
-		self.cpu._cycles = 0 	# Override instruction delay
+		self.cpu.cycles = 0 	# Override instruction delay
 
 	def reset(self):
 		self.cpu.reset()
