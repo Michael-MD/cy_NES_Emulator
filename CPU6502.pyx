@@ -259,16 +259,16 @@ cdef class CPU6502:
 	def connect_bus(self, bus):
 		self.bus = bus
 
-	def write(self, addr, data):
+	cdef void write(self, uint16_t addr, uint8_t data):
 		self.bus.write(addr, data)
 
-	def read(self, addr):
+	cdef uint8_t read(self, uint16_t addr):
 		return self.bus.read(addr)
 
 	def get_flag(self, f):
 		return self.status & f
 
-	def set_flag(self, f, v):
+	cdef void set_flag(self, uint8_t f, uint8_t v):
 		if v:
 			self.status |= f
 		else:
@@ -408,7 +408,7 @@ cdef class CPU6502:
 	Immediate - The data is contained within the second byte of the instruction.
 	Hence, the address is set to the next byte in program memory.
 	"""
-	def IMM(self):
+	cdef uint8_t IMM(self):
 		self._addr_abs = self.pc
 		self.pc+=1
 		return 0
@@ -417,7 +417,7 @@ cdef class CPU6502:
 	Zero Page Adressing (Zero Page) - Assumes data is in first page of memory. Hence, only the 
 	second byte is fetched from the second byte of the instruction.
 	"""
-	def ZP0(self):
+	cdef uint8_t ZP0(self):
 		self._addr_abs = self.read(self.pc)
 		self.pc+=1
 		self._addr_abs &= 0x00FF
@@ -428,7 +428,7 @@ cdef class CPU6502:
 	the second byte of the data given by the second byte in the instruction. The data address is
 	offset by the amount in the x register.
 	"""
-	def ZPX(self):
+	cdef uint8_t ZPX(self):
 		self._addr_abs = self.read(self.pc) + self.x
 		self.pc+=1
 		self._addr_abs &= 0x00FF
@@ -439,7 +439,7 @@ cdef class CPU6502:
 	the second byte of the data given by the second byte in the instruction. The data address is
 	offset by the amount in the y register.
 	"""
-	def ZPY(self):
+	cdef uint8_t ZPY(self):
 		self._addr_abs = self.read(self.pc) + self.y
 		self.pc+=1
 		self._addr_abs &= 0x00FF
@@ -449,7 +449,7 @@ cdef class CPU6502:
 	Relative Adressing - Second byte of instruction branch specifies the pc offset. Value 
 	must remain within -128 to +127 bytes of branch instruction.
 	"""
-	def REL(self):
+	cdef uint8_t REL(self):
 		self._addr_rel = self.read(self.pc)
 		self.pc+=1
 
@@ -462,7 +462,7 @@ cdef class CPU6502:
 	Absolute Adressing - Second byte of instruction specifies low-order bytes of address byte. 
 	Third byte of instruction specifies high-order address byte.
 	"""
-	def ABS(self):
+	cdef uint8_t ABS(self):
 		self._addr_abs = self.read(self.pc) & 0x00FF	# Low byte
 		self.pc+=1
 		self._addr_abs |= (self.read(self.pc)<<8)	# High byte
@@ -474,7 +474,7 @@ cdef class CPU6502:
 	Absolute X Indexed Adressing - Same as absolute addressing except the contents of register x 
 	are added to the absolute address. If page changes, the addition clock cycle is required.
 	"""
-	def ABX(self):
+	cdef uint8_t ABX(self):
 		self._addr_abs = self.read(self.pc) & 0x00FF	# Low byte
 		self.pc+=1
 		hi = (self.read(self.pc)<<8) 	# High byte
@@ -489,7 +489,7 @@ cdef class CPU6502:
 	Absolute Y Indexed Adressing - Same as absolute addressing except the contents of register y 
 	are added to the absolute address. If page changes, the addition clock cycle is required.
 	"""
-	def ABY(self):
+	cdef uint8_t ABY(self):
 		self._addr_abs = self.read(self.pc) & 0x00FF	# Low byte
 		self.pc+=1
 		hi = (self.read(self.pc)<<8) 	# High byte
@@ -504,7 +504,7 @@ cdef class CPU6502:
 	Indirect Adressing - Next two bytes containt the address of the locaiton in memory which 
 	contains the actual data. The first byte is the low byte, the second is the high.
 	"""
-	def IND(self):
+	cdef uint8_t IND(self):
 		ptr_lo = self.read(self.pc)
 		self.pc+=1
 		ptr_hi = self.read(self.pc)
@@ -523,7 +523,7 @@ cdef class CPU6502:
 	Indirect Adressing X - Next byte of instruction specifies address low byte on first page.
 	The address of the high byte is the next byte over on the first page.
 	"""
-	def IZX(self):
+	cdef uint8_t IZX(self):
 		t = self.read(self.pc)
 		self.pc+=1
 		lo = self.read((t + self.x) & 0x00FF) 		# And discards carry
@@ -536,7 +536,7 @@ cdef class CPU6502:
 	after the absolute address is constructed from the first page. If page boundary is crossed, an
 	additional clock cycle is required.
 	"""
-	def IZY(self):
+	cdef uint8_t IZY(self):
 		t = self.read(self.pc)
 		self.pc+=1
 		lo = self.read(t & 0x00FF)
@@ -549,7 +549,7 @@ cdef class CPU6502:
 			return 1
 		return 0
 	
-	def fetch(self):
+	cdef uint8_t fetch(self):
 		if self.lookup[self._opcode].addr_mode != self.IMP:
 			self._fetched = self.read(self._addr_abs)
 
@@ -559,9 +559,9 @@ cdef class CPU6502:
 	A + M + C -> A, C
 	Falgs: N, V, Z, C
 	"""
-	def ADC(self):
+	cdef uint8_t ADC(self):
 		self.fetch()
-		temp = self.a + self._fetched + self.get_flag(self.C)
+		cdef uint8_t temp = (self.a + self._fetched + self.get_flag(self.C))&0xFF
 		self.set_flag(self.C, temp > 255)
 		self.set_flag(self.Z, (temp&0xFF) == 0x00)
 		self.set_flag(self.N, temp & 0x80)
@@ -575,7 +575,7 @@ cdef class CPU6502:
 	A and M -> A
 	self: N, Z
 	"""
-	def AND(self):
+	cdef uint8_t AND(self):
 		self.fetch()
 		self.a &= (self._fetched&0xFF)
 		self.set_flag(self.Z, self.a == 0x00)	# Set zero flag
@@ -587,7 +587,7 @@ cdef class CPU6502:
 	C <- /M7...M0/ <- 0
 	self: C, Z, N
 	"""
-	def ASL(self):
+	cdef uint8_t ASL(self):
 		self.fetch()
 		temp = self._fetched << 1
 		self.set_flag(self.C, temp & 0xFF00)
@@ -609,7 +609,7 @@ cdef class CPU6502:
 	Require additional clock cycle if page boundary crossed.
 	self: -
 	"""
-	def BCC(self):
+	cdef uint8_t BCC(self):
 		if self.get_flag(self.C) == 0:
 			self._cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
@@ -628,7 +628,7 @@ cdef class CPU6502:
 	Require additional clock cycle if page boundary crossed.
 	self: -
 	"""
-	def BCS(self):
+	cdef uint8_t BCS(self):
 		if self.get_flag(self.C):
 			self._cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
@@ -648,7 +648,7 @@ cdef class CPU6502:
 	Require additional clock cycle if page boundary crossed.
 	self: -
 	"""
-	def BEQ(self):
+	cdef uint8_t BEQ(self):
 		if self.get_flag(self.Z):
 			self._cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
@@ -666,7 +666,7 @@ cdef class CPU6502:
 	A and M
 	self: N, V
 	"""
-	def BIT(self):
+	cdef uint8_t BIT(self):
 		self.fetch()
 		temp = self.a & self._fetched
 		self.set_flag(self.Z, temp == 0x00)	# Set zero flag
@@ -679,7 +679,7 @@ cdef class CPU6502:
 	BMI - Branch on result minus.
 	self: -
 	"""
-	def BMI(self):
+	cdef uint8_t BMI(self):
 		if self.get_flag(self.N):
 			self._cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
@@ -695,7 +695,7 @@ cdef class CPU6502:
 	BNE - Branch on result not zero (Branch on Not Equal)
 	self: -
 	"""
-	def BNE(self):
+	cdef uint8_t BNE(self):
 		if self.get_flag(self.Z) == 0:
 			self._cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
@@ -711,7 +711,7 @@ cdef class CPU6502:
 	BPL - Branch on Result Plus
 	self: -
 	"""
-	def BPL(self):
+	cdef uint8_t BPL(self):
 		if self.get_flag(self.N) == 0:
 			self._cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
@@ -728,7 +728,7 @@ cdef class CPU6502:
 	Pushes program counter and status register on stack in preparation for interript vector.
 	self: I <- 1
 	"""
-	def BRK(self):
+	cdef uint8_t BRK(self):
 		self.write(0x100 + self.stkp, (self.pc>>8) & 0xFF)	# Store high byte
 		# self.stkp-=1
 		self.stkp = (self.stkp + 0xFF) & 0xFF 	# Subtract using 2's complement
@@ -754,7 +754,7 @@ cdef class CPU6502:
 	BVC - Branch on Overflow Clear
 	self: -
 	"""
-	def BVC(self):
+	cdef uint8_t BVC(self):
 		if self.get_flag(self.V) == 0:
 			self._cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
@@ -770,7 +770,7 @@ cdef class CPU6502:
 	BVS - Branch on Overflow Set
 	self: -
 	"""
-	def BVS(self):
+	cdef uint8_t BVS(self):
 		if self.get_flag(self.V):
 			self._cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
@@ -787,7 +787,7 @@ cdef class CPU6502:
 	C <- 0
 	self: C <- 0
 	"""
-	def CLC(self):
+	cdef uint8_t CLC(self):
 		self.set_flag(self.C, 0)
 		return 0
 
@@ -796,7 +796,7 @@ cdef class CPU6502:
 	D <- 0
 	self: D <- 0
 	"""
-	def CLD(self):
+	cdef uint8_t CLD(self):
 		self.set_flag(self.D, 0)
 		return 0
 
@@ -805,7 +805,7 @@ cdef class CPU6502:
 	I <- 0
 	self: I <- 0
 	"""
-	def CLI(self):
+	cdef uint8_t CLI(self):
 		self.set_flag(self.I, 0)
 		return 0
 
@@ -814,7 +814,7 @@ cdef class CPU6502:
 	V <- 0
 	self: V <- 0
 	"""
-	def CLV(self):
+	cdef uint8_t CLV(self):
 		self.set_flag(self.V, 0)
 		return 0
 
@@ -823,7 +823,7 @@ cdef class CPU6502:
 	A-M 
 	self: C, Z, N
 	"""
-	def CMP(self):
+	cdef uint8_t CMP(self):
 		self.fetch()
 		temp = self.a - self._fetched
 		self.set_flag(self.C, self.a >= self._fetched)
@@ -836,7 +836,7 @@ cdef class CPU6502:
 	X-M 
 	self: C, Z, N
 	"""
-	def CPX(self):
+	cdef uint8_t CPX(self):
 		self.fetch()
 		temp = self.x - self._fetched
 		self.set_flag(self.C, self.x >= self._fetched)
@@ -849,7 +849,7 @@ cdef class CPU6502:
 	Y-M 
 	self: C, Z, N
 	"""	
-	def CPY(self):
+	cdef uint8_t CPY(self):
 		self.fetch()
 		temp = self.y - self._fetched
 		self.set_flag(self.C, self.y >= self._fetched)
@@ -862,7 +862,7 @@ cdef class CPU6502:
 	M <- M-1
 	self: N, Z
 	"""
-	def DEC(self):
+	cdef uint8_t DEC(self):
 		self.fetch()
 		temp = self._fetched - 1
 		self.set_flag(self.Z, (temp&0xFF) == 0)
@@ -875,7 +875,7 @@ cdef class CPU6502:
 	X <- X-1
 	self: N, Z
 	"""
-	def DEX(self):
+	cdef uint8_t DEX(self):
 		self.x-=1
 		self.x&=0xFF
 		self.set_flag(self.Z, self.x == 0)
@@ -887,7 +887,7 @@ cdef class CPU6502:
 	Y <- Y-1
 	self: N, Z
 	"""
-	def DEY(self):
+	cdef uint8_t DEY(self):
 		self.y-=1
 		self.y&=0xFF
 		self.set_flag(self.Z, self.y == 0)
@@ -899,7 +899,7 @@ cdef class CPU6502:
 	A <- A ^ M
 	self: N, Z
 	"""
-	def EOR(self):
+	cdef uint8_t EOR(self):
 		self.fetch()
 		temp = self._fetched ^ self.a
 		self.a = 0xFF & temp
@@ -912,9 +912,9 @@ cdef class CPU6502:
 	M <- M+1
 	self: N, Z
 	"""
-	def INC(self):
+	cdef uint8_t INC(self):
 		self.fetch()
-		temp = self._fetched + 1
+		cdef uint8_t temp = self._fetched + 1
 		temp&=0xFF
 		self.write(self._addr_abs, temp)
 		self.set_flag(self.Z, temp == 0)
@@ -926,7 +926,7 @@ cdef class CPU6502:
 	X <- X+1
 	self: N, Z
 	"""
-	def INX(self):
+	cdef uint8_t INX(self):
 		self.x+=1
 		self.x&=0xFF
 		self.set_flag(self.Z, self.x == 0)
@@ -938,7 +938,7 @@ cdef class CPU6502:
 	Y <- Y+1
 	self: N, Z
 	"""
-	def INY(self):
+	cdef uint8_t INY(self):
 		self.y+=1
 		self.y&=0xFF
 		self.set_flag(self.Z, self.y == 0)
@@ -951,7 +951,7 @@ cdef class CPU6502:
 	[PC + 1] → PCL, [PC + 2] → PCH
 	self: -
 	"""
-	def JMP(self):
+	cdef uint8_t JMP(self):
 		self.pc = self._addr_abs
 		return 0
 	
@@ -961,7 +961,7 @@ cdef class CPU6502:
 	PC + 2↓, [PC + 1] → PCL, [PC + 2] → PCH
 	self: -
 	"""
-	def JSR(self):
+	cdef uint8_t JSR(self):
 		self.pc-=1
 		self.write(0x100 + self.stkp, (self.pc>>8) & 0xFF)	# Store high byte
 		# self.stkp-=1
@@ -979,7 +979,7 @@ cdef class CPU6502:
 	A <- M
 	self: N, Z
 	"""
-	def LDA(self):
+	cdef uint8_t LDA(self):
 		self.fetch()
 		self.a = self._fetched & 0xFF
 		self.set_flag(self.Z, self.a == 0)
@@ -992,7 +992,7 @@ cdef class CPU6502:
 	X <- M
 	self: N, Z
 	"""
-	def LDX(self):
+	cdef uint8_t LDX(self):
 		self.fetch()
 		self.x = self._fetched & 0xFF
 		self.set_flag(self.Z, self.x == 0)
@@ -1004,7 +1004,7 @@ cdef class CPU6502:
 	Y <- M
 	self: N, Z
 	"""
-	def LDY(self):
+	cdef uint8_t LDY(self):
 		self.fetch()
 		self.y = self._fetched & 0xFF
 		self.set_flag(self.Z, self.y == 0)
@@ -1016,7 +1016,7 @@ cdef class CPU6502:
 	0 → /M7...M0/ → C
 	self: N, Z, C
 	"""
-	def LSR(self):
+	cdef uint8_t LSR(self):
 		self.fetch()
 		self.set_flag(self.C, self._fetched & 0x01)
 		self._fetched >>= 1
@@ -1034,7 +1034,7 @@ cdef class CPU6502:
 	"""
 	NOP - No Operation
 	"""
-	def NOP(self):
+	cdef uint8_t NOP(self):
 		return 0
 
 	"""
@@ -1042,7 +1042,7 @@ cdef class CPU6502:
 	A ∨ M → A
 	self: -
 	"""
-	def ORA(self):
+	cdef uint8_t ORA(self):
 		self.fetch()
 		self.a = (self.a&0xFF) | (self._fetched&0xFF)
 		self.set_flag(self.N, self.a & 0x80)
@@ -1054,7 +1054,7 @@ cdef class CPU6502:
 	A↓
 	self: -
 	"""
-	def PHA(self):
+	cdef uint8_t PHA(self):
 		self.write(0x100 + self.stkp, self.a & 0xFF)		# Store low byte
 		# self.stkp-=1
 		self.stkp = (self.stkp + 0xFF) & 0xFF 	# Subtract using 2's complement
@@ -1065,7 +1065,7 @@ cdef class CPU6502:
 	P↓
 	self: -
 	"""
-	def PHP(self):
+	cdef uint8_t PHP(self):
 		self.write(0x100 + self.stkp, (self.status & 0xFF) | self.B | self.U)		# Store low byte
 		self.set_flag(self.B, 0)
 		self.set_flag(self.U, 0)
@@ -1078,7 +1078,7 @@ cdef class CPU6502:
 	A↑
 	self: N, Z
 	"""
-	def PLA(self):
+	cdef uint8_t PLA(self):
 		# self.stkp+=1
 		self.stkp = (self.stkp+1)&0xFF
 		self.a = self.read(0x100 + self.stkp)		# Store low byte
@@ -1091,7 +1091,7 @@ cdef class CPU6502:
 	P↑
 	self: N, V, D, I, Z, C
 	"""
-	def PLP(self):
+	cdef uint8_t PLP(self):
 		# self.stkp+=1
 		self.stkp = (self.stkp+1)&0xFF
 		self.status = self.read(0x100 + self.stkp)		# Store low byte
@@ -1103,7 +1103,7 @@ cdef class CPU6502:
 	C ← /M7...M0/ ← C
 	self: N, Z, C
 	"""
-	def ROL(self):
+	cdef uint8_t ROL(self):
 		self.fetch()
 		self._fetched <<= 1
 		self._fetched |= self.get_flag(self.C)
@@ -1125,7 +1125,7 @@ cdef class CPU6502:
 	C → /M7...M0/ → C
 	self: N, Z, C
 	"""
-	def ROR(self):
+	cdef uint8_t ROR(self):
 		self.fetch()
 		temp = self._fetched & 0x01
 		self._fetched >>= 1
@@ -1149,7 +1149,7 @@ cdef class CPU6502:
 	P↑ PC↑
 	self: N, V, D, I, Z, C
 	"""
-	def RTI(self):
+	cdef uint8_t RTI(self):
 		# self.stkp+=1
 		self.stkp = (self.stkp+1)&0xFF
 		self.status = self.read(0x100 + self.stkp)
@@ -1172,7 +1172,7 @@ cdef class CPU6502:
 	PC↑, PC + 1 → PC
 	self: -
 	"""
-	def RTS(self):
+	cdef uint8_t RTS(self):
 		self.stkp = (self.stkp+1)&0xFF
 		lo = self.read(0x100 + self.stkp)
 		self.stkp = (self.stkp+1)&0xFF
@@ -1187,10 +1187,10 @@ cdef class CPU6502:
 	A - M - ~C → A
 	self: N, V, Z, C
 	"""
-	def SBC(self):
+	cdef uint8_t SBC(self):
 		self.fetch()
-		value = (self._fetched^0xFF) & 0xFF
-		temp = self.a + value + self.get_flag(self.C)
+		cdef uint8_t value = (self._fetched^0xFF) & 0xFF
+		cdef uint8_t temp = self.a + value + self.get_flag(self.C)
 		self.set_flag(self.C, temp & 0xFF00)
 		self.set_flag(self.Z, (temp&0xFF) == 0x00)
 		self.set_flag(self.N, temp & 0x80)
@@ -1204,7 +1204,7 @@ cdef class CPU6502:
 	1 → C
 	self: C <- 1
 	"""
-	def SEC(self):
+	cdef uint8_t SEC(self):
 		self.set_flag(self.C, 1)
 		return 0
 
@@ -1213,7 +1213,7 @@ cdef class CPU6502:
 	1 → D
 	self: D <- 1
 	"""
-	def SED(self):
+	cdef uint8_t SED(self):
 		self.set_flag(self.D, 1)
 		return 0
 
@@ -1222,7 +1222,7 @@ cdef class CPU6502:
 	1 → I
 	self: I <- 1
 	"""
-	def SEI(self):
+	cdef uint8_t SEI(self):
 		self.set_flag(self.I, 1)
 		return 0
 
@@ -1231,7 +1231,7 @@ cdef class CPU6502:
 	A → M
 	self: -
 	"""
-	def STA(self):
+	cdef uint8_t STA(self):
 		self.write(self._addr_abs, self.a)
 		return 0
 
@@ -1240,7 +1240,7 @@ cdef class CPU6502:
 	X → M
 	self: -
 	"""
-	def STX(self):
+	cdef uint8_t STX(self):
 		self.write(self._addr_abs, self.x)
 		return 0
 
@@ -1249,7 +1249,7 @@ cdef class CPU6502:
 	Y → M
 	self: -
 	"""
-	def STY(self):
+	cdef uint8_t STY(self):
 		self.write(self._addr_abs, self.y)
 		return 0
 
@@ -1258,7 +1258,7 @@ cdef class CPU6502:
 	Z → M
 	self: -
 	"""
-	def STZ(self):
+	cdef uint8_t STZ(self):
 		self.write(self._addr_abs, self.Z)
 		return 0
 
@@ -1267,7 +1267,7 @@ cdef class CPU6502:
 	A → X
 	self: N, Z
 	"""
-	def TAX(self):
+	cdef uint8_t TAX(self):
 		self.x = self.a
 		self.set_flag(self.N, self.x & 0x80)
 		self.set_flag(self.Z, self.x == 0)
@@ -1278,7 +1278,7 @@ cdef class CPU6502:
 	A → Y
 	self: N, Z
 	"""
-	def TAY(self):
+	cdef uint8_t TAY(self):
 		self.y = self.a
 		self.set_flag(self.N, self.y & 0x80)
 		self.set_flag(self.Z, self.y == 0)
@@ -1289,7 +1289,7 @@ cdef class CPU6502:
 	S → X
 	self: N, Z
 	"""
-	def TSX(self):
+	cdef uint8_t TSX(self):
 		self.x = self.stkp
 		self.set_flag(self.N, self.x & 0x80)
 		self.set_flag(self.Z, self.x == 0)
@@ -1300,7 +1300,7 @@ cdef class CPU6502:
 	X → A
 	self: N, Z
 	"""
-	def TXA(self):
+	cdef uint8_t TXA(self):
 		self.a = self.x
 		self.set_flag(self.N, self.a & 0x80)
 		self.set_flag(self.Z, self.a == 0)
@@ -1311,7 +1311,7 @@ cdef class CPU6502:
 	X → S
 	self: N, Z
 	"""
-	def TXS(self):
+	cdef uint8_t TXS(self):
 		self.stkp = self.x & 0xFF
 		return 0
 
@@ -1320,13 +1320,13 @@ cdef class CPU6502:
 	Y → A
 	self: N, Z
 	"""
-	def TYA(self):
+	cdef uint8_t TYA(self):
 		self.a = self.y
 		self.set_flag(self.N, self.a & 0x80)
 		self.set_flag(self.Z, self.a == 0)
 		return 0
 
 	# Invalid instruction
-	def XXX(self):
+	cdef uint8_t XXX(self):
 		print('???')
 		return 0
