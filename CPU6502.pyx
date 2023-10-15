@@ -6,7 +6,6 @@ cdef extern from "stdint.h":
 	ctypedef unsigned char uint8_t
 	ctypedef unsigned short uint16_t
 
-from libcpp cimport bool
 
 class Instruction:
 	def __init__(self, name: str, opcode, addr_mode, cycles: int):
@@ -51,7 +50,7 @@ cdef class CPU6502:
 	cdef uint8_t V
 	cdef uint8_t N
 
-	def __cinit__(self):
+	def __init__(self):
 		self.a = 0x00 		# Accumulator Register
 		self.x = 0x00 		# X Register
 		self.y = 0x00 		# Y Register
@@ -255,8 +254,7 @@ cdef class CPU6502:
 	def opcode(self, v):
 		self._opcode = v
 
-
-	def connect_bus(self, bus):
+	def connect_bus(self, bus: Bus):
 		self.bus = bus
 
 	cdef void write(self, uint16_t addr, uint8_t data):
@@ -268,7 +266,7 @@ cdef class CPU6502:
 	def get_flag(self, f):
 		return self.status & f
 
-	cdef void set_flag(self, uint8_t f, uint8_t v):
+	cdef void set_flag(self, uint16_t f, uint16_t v):
 		if v:
 			self.status |= f
 		else:
@@ -519,6 +517,7 @@ cdef class CPU6502:
 
 		return 0
 
+
 	"""
 	Indirect Adressing X - Next byte of instruction specifies address low byte on first page.
 	The address of the high byte is the next byte over on the first page.
@@ -549,7 +548,7 @@ cdef class CPU6502:
 			return 1
 		return 0
 	
-	cdef uint8_t fetch(self):
+	cdef void fetch(self):
 		if self.lookup[self._opcode].addr_mode != self.IMP:
 			self._fetched = self.read(self._addr_abs)
 
@@ -561,7 +560,7 @@ cdef class CPU6502:
 	"""
 	cdef uint8_t ADC(self):
 		self.fetch()
-		cdef uint8_t temp = (self.a + self._fetched + self.get_flag(self.C))&0xFF
+		cdef uint16_t temp = self.a + self._fetched + self.get_flag(self.C)
 		self.set_flag(self.C, temp > 255)
 		self.set_flag(self.Z, (temp&0xFF) == 0x00)
 		self.set_flag(self.N, temp & 0x80)
@@ -1189,8 +1188,8 @@ cdef class CPU6502:
 	"""
 	cdef uint8_t SBC(self):
 		self.fetch()
-		cdef uint8_t value = (self._fetched^0xFF) & 0xFF
-		cdef uint8_t temp = self.a + value + self.get_flag(self.C)
+		cdef uint16_t value = (self._fetched^0xFF) & 0xFF
+		cdef uint16_t temp = self.a + value + self.get_flag(self.C)
 		self.set_flag(self.C, temp & 0xFF00)
 		self.set_flag(self.Z, (temp&0xFF) == 0x00)
 		self.set_flag(self.N, temp & 0x80)

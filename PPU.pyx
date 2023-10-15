@@ -159,8 +159,8 @@ cdef class PPU:
 	cdef object cartridge
 	cdef object screen
 
-	cdef uint16_t cycle
-	cdef uint16_t scan_line
+	cdef int cycle
+	cdef int scan_line
 
 	cdef object ctrl
 	cdef object mask
