@@ -10,9 +10,9 @@ setup(
     	'CPU6502.pyx', 
     	# 'Bus.pyx',
     	'PPU.pyx',
-    	# 'Cartridge.pyx',
+    	'Cartridge.pyx',
     	# 'Screen.pyx',
-    	# 'NES.pyx',
+    	'NES.pyx',
     	# 'EmulationDebugger.pyx',
     	# 'available_colours.pyx',
     ])
