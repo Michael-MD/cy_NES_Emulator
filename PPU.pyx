@@ -57,14 +57,23 @@ class Ctrl(ctypes.Union):
 	_fields_ = [("b", CtrlBits),
 				("reg", ctypes.c_uint8)]
 
-class Loopy:
-	def __init__(self):
-		self._coarse_x = 0
-		self._coarse_y = 0
-		self._nametable_x = 0
-		self._nametable_y = 0
-		self._fine_y = 0
-		self._unused = 0
+cdef class Loopy:
+	cdef uint8_t coarse_x
+	cdef uint8_t coarse_y
+	cdef uint8_t nametable_x
+	cdef uint8_t nametable_y
+	cdef uint8_t fine_y
+	cdef uint8_t unused
+
+	cdef uint16_t _reg
+
+	def __cinit__(self):
+		self.coarse_x = 0
+		self.coarse_y = 0
+		self.nametable_x = 0
+		self.nametable_y = 0
+		self.fine_y = 0
+		self.unused = 0
 
 		self._reg = 0
 
@@ -72,79 +81,25 @@ class Loopy:
 	def reg(self):
 		return self._reg 
 
-	@property
-	def coarse_x(self):
-		return self._coarse_x  
-
-	@property
-	def coarse_y(self):
-		return self._coarse_y  
-
-	@property
-	def nametable_x(self):
-		return self._nametable_x  
-
-	@property
-	def nametable_y(self):
-		return self._nametable_y  
-
-	@property
-	def fine_y(self):
-		return self._fine_y  
-
-	@property
-	def unused(self):
-		return self._unused
-
 	@reg.setter
 	def reg(self, v):
 		self._reg = v & 0xFFFF
-		self._coarse_x = self._reg & 0x1F
-		self._coarse_y = (self._reg>>5) & 0x1F
-		self._nametable_x = (self._reg>>10) & 0b01
-		self._nametable_y = (self._reg>>11) & 0b01
-		self._fine_y = (self._reg>>12) & 0b111
-		self._unused = (self._reg>>15) & 0b01
+		self.coarse_x = self._reg & 0x1F
+		self.coarse_y = (self._reg>>5) & 0x1F
+		self.nametable_x = (self._reg>>10) & 0b01
+		self.nametable_y = (self._reg>>11) & 0b01
+		self.fine_y = (self._reg>>12) & 0b111
+		self.unused = (self._reg>>15) & 0b01
 
-	def _update_reg(self):
+	cdef void update_reg(self):
 		self._reg = (
-			(self._unused << 15) |
-			(self._fine_y << 12) |
-			(self._nametable_y << 11) |
-			(self._nametable_x << 10) |
-			(self._coarse_y << 5) |
-			self._coarse_x
+			(self.unused << 15) |
+			(self.fine_y << 12) |
+			(self.nametable_y << 11) |
+			(self.nametable_x << 10) |
+			(self.coarse_y << 5) |
+			self.coarse_x
 		)
-
-	@coarse_x.setter
-	def coarse_x(self, v):
-		self._coarse_x = v & 0x1F
-		self._update_reg()
-
-	@coarse_y.setter
-	def coarse_y(self, v):
-		self._coarse_y = v & 0x1F
-		self._update_reg()
-
-	@nametable_x.setter
-	def nametable_x(self, v):
-		self._nametable_x = v & 0b01
-		self._update_reg()
-
-	@nametable_y.setter
-	def nametable_y(self, v):
-		self._nametable_y = v & 0b01
-		self._update_reg()
-
-	@fine_y.setter
-	def fine_y(self, v):
-		self._fine_y = v & 0b111
-		self._update_reg()
-
-	@unused.setter
-	def unused(self, v):
-		self._unused = v & 0b01
-		self._update_reg()
 
 
 cdef class PPU:
@@ -165,8 +120,8 @@ cdef class PPU:
 	cdef object ctrl
 	cdef object mask
 	cdef object status
-	cdef object loopy_t
-	cdef object loopy_v
+	cdef Loopy loopy_t
+	cdef Loopy loopy_v
 
 	cdef uint8_t fine_x
 	cdef uint8_t data
@@ -316,7 +271,7 @@ cdef class PPU:
 					 a 32x30 grid (10bits). Total: 12bits. The remaining bits are unused.
 					 We then offset into the range the nametables are located on the bus. 
 					"""
-					self._bg_next_tile_id = self.ppu_read(0x2000|(self.loopy_v.reg&0x0FFF))
+					self._bg_next_tile_id = self.ppu_read(0x2000|(self.loopy_v._reg&0x0FFF))
 
 				elif (self.cycle-1)%8 == 2:	# Prepare attribute
 					"""
@@ -425,6 +380,7 @@ cdef class PPU:
 							self.loopy_v.nametable_x^=1 # Negate nametable bit to increment nametable
 						else:
 							self.loopy_v.coarse_x+=1
+						self.loopy_v.update_reg()
 
 			if self.cycle == 256: 	# Increment Y to next row
 				"""
@@ -451,6 +407,8 @@ cdef class PPU:
 						else:	# No wrap arounds so just increment normally
 							self.loopy_v.coarse_y+=1
 
+					self.loopy_v.update_reg()
+
 			if self.cycle == 257:
 				"""
 				If we reach edge of screen we need to update the vram register with what is in the tram
@@ -460,14 +418,18 @@ cdef class PPU:
 					self.loopy_v.nametable_x = self.loopy_t.nametable_x
 					self.loopy_v.coarse_x = self.loopy_t.coarse_x
 
+					self.loopy_v.update_reg()
+
 			# if self.cycle == 338 or self.cycle == 340:
-			# 	self._bg_next_tile_id = self.ppu_read(0x2000 | (self.loopy_v.reg&0x0FFF))
+			# 	self._bg_next_tile_id = self.ppu_read(0x2000 | (self.loopy_v._reg&0x0FFF))
 
 			if self.scan_line == -1 and self.cycle >= 280 and self.cycle < 305:
 				if self.mask.b.render_background or self.mask.b.render_sprites:
 					self.loopy_v.nametable_y = self.loopy_t.nametable_y
 					self.loopy_v.coarse_y = self.loopy_t.coarse_y
 					self.loopy_v.fine_y = self.loopy_t.fine_y
+
+					self.loopy_v.update_reg()
 
 		if self.scan_line >= 241 and self.scan_line < 261:
 			# Set vertical blank at scan line below bottom of page and set nmi i.e. emit interrupt
@@ -591,18 +553,20 @@ cdef class PPU:
 				self.loopy_t.fine_y = data&0x7	# Lower 3 bits specify pixel
 				self.loopy_t.coarse_y = data>>3 	# Upper 5 bits specify y-coord of tile in nametable (30)
 				self._address_latch = 0
+
+			self.loopy_v.update_reg()
 			
 		elif addr == 0x0006:		# PPU Address
 			if self._address_latch == 0:
-				self.loopy_t.reg = ((data&0x3F)<<8) | (self.loopy_t.reg&0x00FF)	# Writing high byte
+				self.loopy_t._reg = ((data&0x3F)<<8) | (self.loopy_t._reg&0x00FF)	# Writing high byte
 				self._address_latch = 1
 			else:
-				self.loopy_t.reg = (self.loopy_t.reg&0xFF00) | data	# Writing low byte
-				self.loopy_v.reg = self.loopy_t.reg
+				self.loopy_t.reg = (self.loopy_t._reg&0xFF00) | data	# Writing low byte
+				self.loopy_v.reg = self.loopy_t._reg
 				self._address_latch = 0
 
 		elif addr == 0x0007:		# PPU Data
-			self.ppu_write(self.loopy_v.reg, data)
+			self.ppu_write(self.loopy_v._reg, data)
 			self.loopy_v.reg += (32 if self.ctrl.b.increment_mode else 1)
 
 	cpdef uint8_t cpu_read(self, uint16_t addr):
@@ -627,9 +591,9 @@ cdef class PPU:
 			return 0x00 	# Cannot read address register
 		elif addr == 0x0007:		# PPU Data
 			data = self._ppu_data_buffer
-			self._ppu_data_buffer = self.ppu_read(self.loopy_v.reg)
+			self._ppu_data_buffer = self.ppu_read(self.loopy_v._reg)
 
-			if self.loopy_v.reg >= 0x3F00:					# Palette uses combinatorial logic which can output data in same clock cycle
+			if self.loopy_v._reg >= 0x3F00:					# Palette uses combinatorial logic which can output data in same clock cycle
 				data = self._ppu_data_buffer
 
 			self.loopy_v.reg += (32 if self.ctrl.b.increment_mode else 1)
