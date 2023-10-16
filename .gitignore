@@ -6,3 +6,4 @@ test*
 *.exp
 *.lib
 *.obj
+*.html
