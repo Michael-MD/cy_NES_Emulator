@@ -439,8 +439,15 @@ cdef class PPU:
 				if self.ctrl.b.enable_nmi:
 					self.nmi = True
 
-		bg_pixel = 0
-		bg_palette = 0
+		cdef uint8_t bg_pixel = 0
+		cdef uint8_t bg_palette = 0
+
+		cdef uint16_t bit_mux
+
+		cdef uint8_t p0_pixel
+		cdef uint8_t p1_pixel
+		cdef uint8_t bg_pal0
+		cdef uint8_t bg_pal1
 
 		if self.mask.b.render_background:
 			bit_mux = 0x8000 >> self.fine_x
