@@ -1,4 +1,3 @@
-# cython: Profile=True
 import numpy as np
 import ctypes
 c_uint8 = ctypes.c_uint8
