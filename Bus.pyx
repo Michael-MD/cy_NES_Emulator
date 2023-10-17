@@ -1,7 +1,19 @@
 import numpy as np
 
-class Bus:
-	def __init__(self):
+cdef extern from "stdint.h":
+	ctypedef unsigned char uint8_t
+	ctypedef unsigned short uint16_t
+
+cdef class Bus:
+	cdef object cpu
+	cdef object ppu
+	cdef object cartridge
+	cdef uint8_t cpu_ram[2048]
+	cdef int n_system_clock_counter
+	cdef uint8_t _controller[2]
+	cdef uint8_t _controller_state[2]
+
+	def __cinit__(self):
 		self.cpu = None
 		self.ppu = None
 		self.cartridge = None
@@ -10,8 +22,16 @@ class Bus:
 		self.n_system_clock_counter = 0
 
 		# Controller state
-		self.controller = np.zeros(2, dtype=np.uint8)	# Keeps track of controller
-		self.controller_state = np.zeros(2, dtype=np.uint8)	# Latches controlller state after CPU write
+		self._controller = np.zeros(2, dtype=np.uint8)	# Keeps track of controller
+		self._controller_state = np.zeros(2, dtype=np.uint8)	# Latches controlller state after CPU write
+
+	@property
+	def controller(self):
+		return self._controller[0]
+
+	@controller.setter
+	def controller(self, v):
+		self._controller[0] = v
 
 	def clock(self):
 		self.ppu.clock()
@@ -50,10 +70,10 @@ class Bus:
 		elif addr >= 0x2000 and addr <= 0x3FFF:		# Write to PPU
 			self.ppu.cpu_write(addr & 0x0007, data)		# PPU has 8 registers
 		elif addr == 0x4016 or addr == 0x4017:		# Controller Memory mapped IO
-			self.controller_state[addr&0x0001] = self.controller[addr&0x0001]&0xFF
+			self._controller_state[addr&0x0001] = self._controller[addr&0x0001]&0xFF
 
-	def read(self, addr: np.uint16, bReadOnly: bool = False):
-		data, valid_addr = self.cartridge.cpu_read(addr, bReadOnly)
+	def read(self, addr: np.uint16):
+		data, valid_addr = self.cartridge.cpu_read(addr)
 		if valid_addr:	# Read from cartridge
 			return data
 		elif addr >= 0x0000 and addr <= 0x1FFF:		# Read from CPU RAM
@@ -61,8 +81,8 @@ class Bus:
 		elif addr >= 0x2000 and addr <= 0x3FFF:		# Read from PPU
 			return self.ppu.cpu_read(addr & 0x0007)	# PPU has 8 registers
 		elif addr == 0x4016 or addr == 0x4017:		# Controller Memory mapped IO
-			data = (self.controller_state[addr&0x0001] & 0x80) > 0
-			self.controller_state[addr&0x0001] <<= 1
+			data = (self._controller_state[addr&0x0001] & 0x80) > 0
+			self._controller_state[addr&0x0001] <<= 1
 			return data
 
 

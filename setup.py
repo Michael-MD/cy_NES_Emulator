@@ -8,7 +8,7 @@ setup(
 	include_dirs=[numpy.get_include()],
     ext_modules=cythonize([
     	'CPU6502.pyx', 
-    	# 'Bus.pyx',
+    	'Bus.pyx',
     	'PPU.pyx',
     	'Cartridge.pyx',
     	# 'Screen.pyx',
