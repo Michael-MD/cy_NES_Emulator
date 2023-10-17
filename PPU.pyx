@@ -1,9 +1,11 @@
+# cython: Profile=True
 import numpy as np
 import ctypes
 c_uint8 = ctypes.c_uint8
 c_uint16 = ctypes.c_uint16
 from .available_colours import pal_screen
-from .Screen import *
+
+cimport numpy as np
 
 import ctypes
 
@@ -112,7 +114,7 @@ cdef class PPU:
 	0x3FFF.
 	"""
 	cdef object cartridge
-	cdef object screen
+	cdef object _screen
 
 	cdef int cycle
 	cdef int scan_line
@@ -152,7 +154,7 @@ cdef class PPU:
 
 	def __cinit__(self):
 		self.cartridge = None
-		self.screen = Screen()
+		self._screen = np.zeros((256, 240, 3), dtype=np.uint8)
 
 		# Populating screen
 		self.cycle = 0 	# Column
@@ -201,7 +203,7 @@ cdef class PPU:
 
 	@property
 	def screen(self):
-		return self.screen
+		return self._screen
 
 	@property
 	def nmi(self):
@@ -456,7 +458,8 @@ cdef class PPU:
 			bg_palette = (bg_pal1<<1) | bg_pal0
 
 		c = self.colours[self.ppu_read(0x3F00 + (bg_palette<<2) + bg_pixel)]
-		self.screen(self.scan_line, self.cycle-1, c)
+		if self.cycle <= 255 and self.scan_line <= 239:
+			self._screen[self.cycle-1, self.scan_line] = c
 
 		self.cycle+=1 	# Scan across screen
 		if self.cycle >= 341:	# Finished columns

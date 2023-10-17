@@ -111,4 +111,7 @@ cdef class NES:
 	def clock(self):
 		self.bus.clock()
 
+	# def run(self):
+
+
 
