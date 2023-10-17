@@ -13,6 +13,8 @@ setup(
     	'Cartridge.pyx',
     	# 'Screen.pyx',
     	'NES.pyx',
+    	'Mappers/Mapper.pyx',
+    	'Mappers/Mapper000.pyx',
     	# 'EmulationDebugger.pyx',
     	# 'available_colours.pyx',
     ])

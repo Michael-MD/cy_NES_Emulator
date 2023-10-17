@@ -1,6 +1,10 @@
-from .Mapper import Mapper
+from .Mapper cimport Mapper
 
-class Mapper000(Mapper):
+cdef extern from "stdint.h":
+	ctypedef unsigned char uint8_t
+	ctypedef unsigned short uint16_t
+
+cdef class Mapper000(Mapper):
 	# PPU with mapper communication
 	def ppu_map_write(self, addr, data):
 		"""
