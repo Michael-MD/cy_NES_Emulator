@@ -1,5 +1,7 @@
 import os
 import numpy as np
+import pygame
+
 from .CPU6502 import CPU6502
 from .Bus import Bus
 from .Cartridge import Cartridge
@@ -23,6 +25,9 @@ cdef class NES:
 	cdef object bus
 	cdef object cpu
 	cdef object ppu
+
+	cdef object screen
+	cdef object _clock
 
 	def __cinit__(self, rom_directory):
 		self.rom_name, self.file_ext = os.path.splitext(rom_directory)
@@ -108,10 +113,51 @@ cdef class NES:
 	def reset(self):
 		self.cpu.reset()
 
-	def clock(self):
+	cdef void clock(self):
 		self.bus.clock()
 
-	# def run(self):
+	cdef void clock_system(self, N=3):
+		# Clock CPU one instruction
+		cdef int i
+		for i in range(N):
+			self.clock()
 
+	cpdef void run(self):
+		pygame.init()
+		self.screen = pygame.display.set_mode((128, 128), pygame.RESIZABLE)
+		self.screen.fill((0,0,0))
+		self._clock = pygame.time.Clock()
 
+		while True:
+			self.clock_system(100_000)
 
+			image_surface = pygame.surfarray.make_surface(self.ppu.screen)
+			self.screen.blit(image_surface, (0, 0))
+
+			self.bus.controller = 0
+			for event in pygame.event.get():
+				keys = pygame.key.get_pressed()
+				if event.type == pygame.QUIT:
+					pygame.quit()
+					exit()
+
+				elif event.type == pygame.KEYDOWN:
+					if event.key == pygame.K_UP:
+						self.bus.controller = self.bus.controller | 0x08
+					if event.key == pygame.K_LEFT:
+						self.bus.controller = self.bus.controller | 0x02
+					if event.key == pygame.K_DOWN:
+						self.bus.controller = self.bus.controller | 0x04
+					if event.key == pygame.K_RIGHT:
+						self.bus.controller = self.bus.controller | 0x01
+					if event.key == pygame.K_s:
+						self.bus.controller = self.bus.controller | 0x10
+					if event.key == pygame.K_a:
+						self.bus.controller = self.bus.controller | 0x20
+					if event.key == pygame.K_z:
+						self.bus.controller = self.bus.controller | 0x40
+					if event.key == pygame.K_x:
+						self.bus.controller = self.bus.controller | 0x80
+
+			self._clock.tick(60)
+			pygame.display.update()
