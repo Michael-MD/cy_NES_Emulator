@@ -135,29 +135,29 @@ cdef class NES:
 			self.screen.blit(image_surface, (0, 0))
 
 			self.bus.controller = 0
+			
 			for event in pygame.event.get():
-				keys = pygame.key.get_pressed()
 				if event.type == pygame.QUIT:
 					pygame.quit()
 					exit()
 
-				elif event.type == pygame.KEYDOWN:
-					if event.key == pygame.K_UP:
-						self.bus.controller = self.bus.controller | 0x08
-					if event.key == pygame.K_LEFT:
-						self.bus.controller = self.bus.controller | 0x02
-					if event.key == pygame.K_DOWN:
-						self.bus.controller = self.bus.controller | 0x04
-					if event.key == pygame.K_RIGHT:
-						self.bus.controller = self.bus.controller | 0x01
-					if event.key == pygame.K_s:
-						self.bus.controller = self.bus.controller | 0x10
-					if event.key == pygame.K_a:
-						self.bus.controller = self.bus.controller | 0x20
-					if event.key == pygame.K_z:
-						self.bus.controller = self.bus.controller | 0x40
-					if event.key == pygame.K_x:
-						self.bus.controller = self.bus.controller | 0x80
+			keys = pygame.key.get_pressed()
+			if keys[pygame.K_UP]:
+				self.bus.controller = self.bus.controller | 0x08
+			if keys[pygame.K_LEFT]:
+				self.bus.controller = self.bus.controller | 0x02
+			if keys[pygame.K_DOWN]:
+				self.bus.controller = self.bus.controller | 0x04
+			if keys[pygame.K_RIGHT]:
+				self.bus.controller = self.bus.controller | 0x01
+			if keys[pygame.K_s]:
+				self.bus.controller = self.bus.controller | 0x10
+			if keys[pygame.K_a]:
+				self.bus.controller = self.bus.controller | 0x20
+			if keys[pygame.K_z]:
+				self.bus.controller = self.bus.controller | 0x40
+			if keys[pygame.K_x]:
+				self.bus.controller = self.bus.controller | 0x80
 
 			self._clock.tick(60)
 			pygame.display.update()
