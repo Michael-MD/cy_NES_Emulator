@@ -124,8 +124,8 @@ cdef class NES:
 
 	cpdef void run(self):
 		pygame.init()
-		self.screen = pygame.display.set_mode((128, 128), pygame.RESIZABLE)
-		self.screen.fill((0,0,0))
+		self.screen = pygame.display.set_mode((256, 240), pygame.RESIZABLE)
+		self.screen.fill((0,0,1))
 		self._clock = pygame.time.Clock()
 
 		while True:
