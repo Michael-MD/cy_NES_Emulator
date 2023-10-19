@@ -14,49 +14,146 @@ cdef extern from "stdint.h":
 
 from libcpp cimport bool
 
-class StatusBits(ctypes.LittleEndianStructure):
-	_fields_ = [
-		("unused", ctypes.c_uint8, 5),
-		("sprite_overflow", ctypes.c_uint8, 1),
-		("sprite_zero_hit", ctypes.c_uint8, 1),
-		("vertical_blank", ctypes.c_uint8, 1),
-	]
+cdef class Ctrl:
+	cdef uint8_t nametable_x
+	cdef uint8_t nametable_y
+	cdef uint8_t increment_mode
+	cdef uint8_t pattern_sprite
+	cdef uint8_t pattern_background
+	cdef uint8_t sprite_size
+	cdef uint8_t slave_mode
+	cdef uint8_t enable_nmi
 
-class MaskBits(ctypes.LittleEndianStructure):
-	_fields_ = [
-		("grayscale", ctypes.c_uint8, 1),
-		("render_background_left", ctypes.c_uint8, 1),
-		("render_sprites_left", ctypes.c_uint8, 1),
-		("render_background", ctypes.c_uint8, 1),
-		("render_sprites", ctypes.c_uint8, 1),
-		("enhance_red", ctypes.c_uint8, 1),
-		("enhance_green", ctypes.c_uint8, 1),
-		("enhance_blue", ctypes.c_uint8, 1),
-	]
+	cdef uint16_t _reg
 
-class CtrlBits(ctypes.LittleEndianStructure):
-	_fields_ = [
-		("nametable_x", ctypes.c_uint8, 1),
-		("nametable_y", ctypes.c_uint8, 1),
-		("increment_mode", ctypes.c_uint8, 1),
-		("pattern_sprite", ctypes.c_uint8, 1),
-		("pattern_background", ctypes.c_uint8, 1),
-		("sprite_size", ctypes.c_uint8, 1),
-		("slave_mode", ctypes.c_uint8, 1),    # Unused
-		("enable_nmi", ctypes.c_uint8, 1),
-	]
+	def __cinit__(self):
+		self.nametable_x = 0
+		self.nametable_y = 0
+		self.increment_mode = 0
+		self.pattern_sprite = 0
+		self.pattern_background = 0
+		self.sprite_size = 0
+		self.slave_mode = 0
+		self.enable_nmi = 0
 
-class Status(ctypes.Union):
-	_fields_ = [("b", StatusBits),
-				("reg", ctypes.c_uint8)]
+		self._reg = 0
 
-class Mask(ctypes.Union):
-	_fields_ = [("b", MaskBits),
-				("reg", ctypes.c_uint8)]
+	@property
+	def reg(self):
+		return self._reg 
 
-class Ctrl(ctypes.Union):
-	_fields_ = [("b", CtrlBits),
-				("reg", ctypes.c_uint8)]
+	@reg.setter
+	def reg(self, v):
+		self._reg = v & 0xFFFF
+		self.nametable_x = self._reg & (1 << 0)
+		self.nametable_y = self._reg & (1 << 1)
+		self.increment_mode = self._reg & (1 << 2)
+		self.pattern_sprite = self._reg & (1 << 3)
+		self.pattern_background = self._reg & (1 << 4)
+		self.sprite_size = self._reg & (1 << 5)
+		self.slave_mode = self._reg & (1 << 6)
+		self.enable_nmi = self._reg & (1 << 7)
+
+	cdef void update_reg(self):
+		self._reg = (
+			(self.nametable_x << 0) |
+			(self.nametable_y << 1) |
+			(self.increment_mode << 2) |
+			(self.pattern_sprite << 3) |
+			(self.pattern_background << 4) |
+			(self.sprite_size << 5) |
+			(self.slave_mode << 6) |
+			(self.enable_nmi << 7)
+		)
+
+
+cdef class Mask:
+	cdef uint8_t grayscale
+	cdef uint8_t render_background_left
+	cdef uint8_t render_sprites_left
+	cdef uint8_t render_background
+	cdef uint8_t render_sprites
+	cdef uint8_t enhance_red
+	cdef uint8_t enhance_green
+	cdef uint8_t enhance_blue
+
+	cdef uint16_t _reg
+
+	def __cinit__(self):
+		self.grayscale = 0
+		self.render_background_left = 0
+		self.render_sprites_left = 0
+		self.render_background = 0
+		self.render_sprites = 0
+		self.enhance_red = 0
+		self.enhance_green = 0
+		self.enhance_blue = 0
+
+		self._reg = 0
+
+	@property
+	def reg(self):
+		return self._reg 
+
+	@reg.setter
+	def reg(self, v):
+		self._reg = v & 0xFFFF
+		self.grayscale = self._reg & (1 << 0)
+		self.render_background_left = self._reg & (1 << 1)
+		self.render_sprites_left = self._reg & (1 << 2)
+		self.render_background = self._reg & (1 << 3)
+		self.render_sprites = self._reg & (1 << 4)
+		self.enhance_red = self._reg & (1 << 5)
+		self.enhance_green = self._reg & (1 << 6)
+		self.enhance_blue = self._reg & (1 << 7)
+
+	cdef void update_reg(self):
+		self._reg = (
+			(self.grayscale << 0) |
+			(self.render_background_left << 1) |
+			(self.render_sprites_left << 2) |
+			(self.render_background << 3) |
+			(self.render_sprites << 4) |
+			(self.enhance_red << 5) |
+			(self.enhance_green << 6) |
+			(self.enhance_blue << 7)
+		)
+
+cdef class Status:
+	cdef uint8_t unused
+	cdef uint8_t sprite_overflow
+	cdef uint8_t sprite_zero_hit
+	cdef uint8_t vertical_blank
+
+	cdef uint16_t _reg
+
+	def __cinit__(self):
+		self.unused = 0
+		self.sprite_overflow = 0
+		self.sprite_zero_hit = 0
+		self.vertical_blank = 0
+
+		self._reg = 0
+
+	@property
+	def reg(self):
+		return self._reg 
+
+	@reg.setter
+	def reg(self, v):
+		self._reg = v & 0xFFFF
+		self.unused = self._reg & 0x1F
+		self.sprite_overflow = (self._reg>>5) & 0b01
+		self.sprite_zero_hit = (self._reg>>6) & 0b01
+		self.vertical_blank = (self._reg>>7) & 0b01
+
+	cdef void update_reg(self):
+		self._reg = (
+			(self.unused << 0) |
+			(self.sprite_overflow << 5) |
+			(self.sprite_zero_hit << 6) |
+			(self.vertical_blank << 7)
+		)
 
 cdef class Loopy:
 	cdef uint8_t coarse_x
@@ -118,9 +215,9 @@ cdef class PPU:
 	cdef int cycle
 	cdef int scan_line
 
-	cdef object ctrl
-	cdef object mask
-	cdef object status
+	cdef Ctrl ctrl
+	cdef Mask mask
+	cdef Status status
 	cdef Loopy loopy_t
 	cdef Loopy loopy_v
 
@@ -248,11 +345,12 @@ cdef class PPU:
 				self.cycle = 1
 
 			if self.scan_line == -1 and self.cycle == 1:	# Unset vertical blank at top of page
-				self.status.b.vertical_blank = 0
+				self.status.vertical_blank = 0
+				self.status.update_reg()
 
 			# Prepare next sprite loop, first condition is while screen is being renderd, second is before jumping to top of screen
 			if (self.cycle >= 2 and self.cycle < 258) or (self.cycle >= 321 and self.cycle < 338):
-				if self.mask.b.render_background:
+				if self.mask.render_background:
 					# Shift registers every cycle
 					self._bg_shifter_pattern_lo <<= 1
 					self._bg_shifter_pattern_hi <<= 1
@@ -342,14 +440,14 @@ cdef class PPU:
 					"""
 					# self._bg_next_tile_lsb = self.cartridge.v_char_memory_nd[	
 					# 									0, 
-					# 									self.ctrl.b.pattern_background,
+					# 									self.ctrl.pattern_background,
 					# 									(self._bg_next_tile_id&0xF0)>>4,
 					# 									self._bg_next_tile_id&0x0F,
 					# 									0,
 					# 									self.loopy_v.fine_y
 					# 								]
 					self._bg_next_tile_lsb = self.ppu_read(
-							(self.ctrl.b.pattern_background<<12)
+							(self.ctrl.pattern_background<<12)
 							+ (self._bg_next_tile_id << 4)
 							+ self.loopy_v.fine_y
 						)
@@ -357,7 +455,7 @@ cdef class PPU:
 				elif (self.cycle-1)%8 == 6:	# Prepare pixel msb
 					# self._bg_next_tile_msb = self.cartridge.v_char_memory_nd[	
 					# 									0, 
-					# 									self.ctrl.b.pattern_background,
+					# 									self.ctrl.pattern_background,
 					# 									(self._bg_next_tile_id&0xF0)>>4,
 					# 									self._bg_next_tile_id&0x0F,
 					# 									1,
@@ -365,7 +463,7 @@ cdef class PPU:
 					# 								]
 
 					self._bg_next_tile_msb = self.ppu_read(
-							(self.ctrl.b.pattern_background<<12)
+							(self.ctrl.pattern_background<<12)
 							+ (self._bg_next_tile_id << 4)
 							+ self.loopy_v.fine_y + 8
 						)
@@ -375,7 +473,7 @@ cdef class PPU:
 					Information about sprite has been loaded so we can increment the course x to begin working on the 
 					next sprite.
 					"""
-					if self.mask.b.render_background or self.mask.b.render_sprites:
+					if self.mask.render_background or self.mask.render_sprites:
 						if self.loopy_v.coarse_x == 31:	# Boundary of nametable reached
 							self.loopy_v.coarse_x = 0
 							self.loopy_v.nametable_x^=1 # Negate nametable bit to increment nametable
@@ -389,7 +487,7 @@ cdef class PPU:
 				in chunks of bytes so we increment course X. However only one row of pixels of the sprite are collected.
 				In other words, we must increment fine y.
 				"""
-				if self.mask.b.render_background or self.mask.b.render_sprites:
+				if self.mask.render_background or self.mask.render_sprites:
 					if self.loopy_v.fine_y < 7:
 						self.loopy_v.fine_y+=1
 					else:
@@ -415,7 +513,7 @@ cdef class PPU:
 				If we reach edge of screen we need to update the vram register with what is in the tram
 				"""
 				self._load_bg_shifters()
-				if self.mask.b.render_background or self.mask.b.render_sprites:
+				if self.mask.render_background or self.mask.render_sprites:
 					self.loopy_v.nametable_x = self.loopy_t.nametable_x
 					self.loopy_v.coarse_x = self.loopy_t.coarse_x
 
@@ -425,7 +523,7 @@ cdef class PPU:
 			# 	self._bg_next_tile_id = self.ppu_read(0x2000 | (self.loopy_v._reg&0x0FFF))
 
 			if self.scan_line == -1 and self.cycle >= 280 and self.cycle < 305:
-				if self.mask.b.render_background or self.mask.b.render_sprites:
+				if self.mask.render_background or self.mask.render_sprites:
 					self.loopy_v.nametable_y = self.loopy_t.nametable_y
 					self.loopy_v.coarse_y = self.loopy_t.coarse_y
 					self.loopy_v.fine_y = self.loopy_t.fine_y
@@ -435,9 +533,11 @@ cdef class PPU:
 		if self.scan_line >= 241 and self.scan_line < 261:
 			# Set vertical blank at scan line below bottom of page and set nmi i.e. emit interrupt
 			if self.scan_line == 241 and self.cycle == 1:	
-				self.status.b.vertical_blank = 1
+				self.status.vertical_blank = 1
+				self.status.update_reg()
+
 				self.end_of_frame = True
-				if self.ctrl.b.enable_nmi:
+				if self.ctrl.enable_nmi:
 					self.nmi = True
 
 		cdef uint8_t bg_pixel = 0
@@ -445,7 +545,7 @@ cdef class PPU:
 
 		cdef uint16_t bit_mux
 
-		if self.mask.b.render_background:
+		if self.mask.render_background:
 			bit_mux = 0x8000 >> self.fine_x
 
 			p0_pixel = (self._bg_shifter_pattern_lo&bit_mux) > 0
@@ -538,8 +638,8 @@ cdef class PPU:
 	cpdef void cpu_write(self, uint16_t addr, uint8_t data):
 		if addr == 0x0000:			# Control
 			self.ctrl.reg = data
-			self.loopy_t.nametable_x = self.ctrl.b.nametable_x
-			self.loopy_t.nametable_y = self.ctrl.b.nametable_y
+			self.loopy_t.nametable_x = self.ctrl.nametable_x
+			self.loopy_t.nametable_y = self.ctrl.nametable_y
 		elif addr == 0x0001:		# Mask
 			self.mask.reg = data
 		elif addr == 0x0002:		# Status
@@ -571,7 +671,7 @@ cdef class PPU:
 
 		elif addr == 0x0007:		# PPU Data
 			self.ppu_write(self.loopy_v._reg, data)
-			self.loopy_v.reg += (32 if self.ctrl.b.increment_mode else 1)
+			self.loopy_v.reg += (32 if self.ctrl.increment_mode else 1)
 
 	cpdef uint8_t cpu_read(self, uint16_t addr):
 		data = 0x00
@@ -580,10 +680,11 @@ cdef class PPU:
 		elif addr == 0x0001:		# Mask
 			... # Not readable
 		elif addr == 0x0002:		# Status
-			# self.status.b.vertical_blank = 1 	# Uncomment for quick testing
+			# self.status.vertical_blank = 1 	# Uncomment for quick testing
 			# First 5 status registers unused usually and will contain noise or buffer data 
 			data = (self.status.reg&0xE0) | (self._ppu_data_buffer&0x1F)
-			self.status.b.vertical_blank = 0
+			self.status.vertical_blank = 0
+			self.status.update_reg()
 			self._address_latch = 0
 		elif addr == 0x0003:		# OAM Address
 			...
@@ -600,7 +701,7 @@ cdef class PPU:
 			if self.loopy_v._reg >= 0x3F00:					# Palette uses combinatorial logic which can output data in same clock cycle
 				data = self._ppu_data_buffer
 
-			self.loopy_v.reg += (32 if self.ctrl.b.increment_mode else 1)
+			self.loopy_v.reg += (32 if self.ctrl.increment_mode else 1)
 		return data
 
 
