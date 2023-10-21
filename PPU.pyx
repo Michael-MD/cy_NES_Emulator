@@ -45,14 +45,14 @@ cdef class Ctrl:
 	@reg.setter
 	def reg(self, v):
 		self._reg = v & 0xFFFF
-		self.nametable_x = self._reg & (1 << 0)
-		self.nametable_y = self._reg & (1 << 1)
-		self.increment_mode = self._reg & (1 << 2)
-		self.pattern_sprite = self._reg & (1 << 3)
-		self.pattern_background = self._reg & (1 << 4)
-		self.sprite_size = self._reg & (1 << 5)
-		self.slave_mode = self._reg & (1 << 6)
-		self.enable_nmi = self._reg & (1 << 7)
+		self.nametable_x = (self._reg>>0) & 1
+		self.nametable_y = (self._reg>>1) & 1
+		self.increment_mode = (self._reg>>2) & 1
+		self.pattern_sprite = (self._reg>>3) & 1
+		self.pattern_background = (self._reg>>4) & 1
+		self.sprite_size = (self._reg>>5) & 1
+		self.slave_mode = (self._reg>>6) & 1
+		self.enable_nmi = (self._reg>>7) & 1
 
 	cdef void update_reg(self):
 		self._reg = (
