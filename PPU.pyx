@@ -200,6 +200,13 @@ cdef class Loopy:
 		)
 
 
+class OAMEntry:
+	def __init__(self, y, id, attr, x):
+		self.y = y
+		self.id = id
+		self.attr = attr
+		self.x = x
+
 cdef class PPU:
 	"""
 	The PPU has its own internal bus with three memories attached.
@@ -247,6 +254,10 @@ cdef class PPU:
 	cdef uint16_t _bg_shifter_attr_hi
 
 	cdef uint8_t end_of_frame
+
+	cdef object OAM
+	cdef uint8_t OAM_addr
+	cdef uint8_t _entry
 
 	def __cinit__(self):
 		self.cartridge = None
@@ -296,6 +307,14 @@ cdef class PPU:
 		self._bg_shifter_attr_hi = 0x0000		# High bit of pallette to use
 
 		self.end_of_frame = False
+
+		self.OAM = np.full(64, OAMEntry(y=0, id=0, attr=0, x=0), dtype=OAMEntry)
+		self.OAM_addr = 0x00
+		self._entry = 0x00
+
+	@property
+	def OAM(self):
+		return self.OAM
 
 	@property
 	def screen(self):
@@ -519,8 +538,8 @@ cdef class PPU:
 
 					self.loopy_v.update_reg()
 
-			# if self.cycle == 338 or self.cycle == 340:
-			# 	self._bg_next_tile_id = self.ppu_read(0x2000 | (self.loopy_v._reg&0x0FFF))
+			if self.cycle == 338 or self.cycle == 340:
+				self._bg_next_tile_id = self.ppu_read(0x2000 | (self.loopy_v._reg&0x0FFF))
 
 			if self.scan_line == -1 and self.cycle >= 280 and self.cycle < 305:
 				if self.mask.render_background or self.mask.render_sprites:
@@ -645,9 +664,18 @@ cdef class PPU:
 		elif addr == 0x0002:		# Status
 			...	# Cannot be written to
 		elif addr == 0x0003:		# OAM Address
-			...
+			self.OAM_addr = data
 		elif addr == 0x0004:		# OAM Data
-			...
+			self._entry = (self.OAM_addr & 64)
+			if self._entry == 0:
+				self.OAM[self.OAM_addr>>2].y = data
+			elif self._entry == 1:
+				self.OAM[self.OAM_addr>>2].id = data
+			elif self._entry == 2:
+				self.OAM[self.OAM_addr>>2].attr = data
+			elif self._entry == 3:
+				self.OAM[self.OAM_addr>>2].x = data
+
 		elif addr == 0x0005:		# Scroll
 			if self._address_latch == 0:
 				self.fine_x = data&0x7	# Lower 3 bits specify pixel
