@@ -57,14 +57,14 @@ cdef class Ctrl:
 
 	cdef void update_reg(self):
 		self._reg = (
-			(self.nametable_x << 0) |
-			(self.nametable_y << 1) |
-			(self.increment_mode << 2) |
-			(self.pattern_sprite << 3) |
-			(self.pattern_background << 4) |
-			(self.sprite_size << 5) |
-			(self.slave_mode << 6) |
-			(self.enable_nmi << 7)
+			(self.nametable_x << 0)
+			| (self.nametable_y << 1)
+			| (self.increment_mode << 2)
+			| (self.pattern_sprite << 3)
+			| (self.pattern_background << 4)
+			| (self.sprite_size << 5)
+			| (self.slave_mode << 6)
+			| (self.enable_nmi << 7)
 		)
 
 
@@ -110,14 +110,14 @@ cdef class Mask:
 
 	cdef void update_reg(self):
 		self._reg = (
-			(self.grayscale << 0) |
-			(self.render_background_left << 1) |
-			(self.render_sprites_left << 2) |
-			(self.render_background << 3) |
-			(self.render_sprites << 4) |
-			(self.enhance_red << 5) |
-			(self.enhance_green << 6) |
-			(self.enhance_blue << 7)
+			(self.grayscale << 0)
+			| (self.render_background_left << 1)
+			| (self.render_sprites_left << 2)
+			| (self.render_background << 3)
+			| (self.render_sprites << 4)
+			| (self.enhance_red << 5)
+			| (self.enhance_green << 6)
+			| (self.enhance_blue << 7)
 		)
 
 cdef class Status:
@@ -150,10 +150,10 @@ cdef class Status:
 
 	cdef void update_reg(self):
 		self._reg = (
-			(self.unused << 0) |
-			(self.sprite_overflow << 5) |
-			(self.sprite_zero_hit << 6) |
-			(self.vertical_blank << 7)
+			(self.unused << 0)
+			| (self.sprite_overflow << 5)
+			| (self.sprite_zero_hit << 6)
+			| (self.vertical_blank << 7)
 		)
 
 cdef class Loopy:
@@ -192,12 +192,12 @@ cdef class Loopy:
 
 	cdef void update_reg(self):
 		self._reg = (
-			(self.unused << 15) |
-			(self.fine_y << 12) |
-			(self.nametable_y << 11) |
-			(self.nametable_x << 10) |
-			(self.coarse_y << 5) |
-			self.coarse_x
+			(self.unused << 15)
+			| (self.fine_y << 12)
+			| (self.nametable_y << 11)
+			| (self.nametable_x << 10)
+			| (self.coarse_y << 5)
+			| self.coarse_x
 		)
 
 
@@ -266,6 +266,9 @@ cdef class PPU:
 	cdef uint16_t sprite_shifter_pattern_lo_addr
 	cdef uint16_t sprite_shifter_pattern_hi_addr
 
+	cdef uint8_t sprite_zero_hit_possible
+	cdef uint8_t rendering_sprite_zero
+
 	def __cinit__(self):
 		self.cartridge = None
 		self._screen = np.zeros((256, 240, 3), dtype=np.uint8)
@@ -332,6 +335,9 @@ cdef class PPU:
 		self.sprite_shifter_pattern_hi_bits = 0
 		self.sprite_shifter_pattern_hi_addr = 0
 
+		self.sprite_zero_hit_possible = False
+		self.rendering_sprite_zero = False
+
 	@property
 	def OAM(self):
 		return self.OAM
@@ -393,10 +399,11 @@ cdef class PPU:
 			if self.scan_line == -1 and self.cycle == 1:	# Unset vertical blank at top of page
 				self.status.vertical_blank = 0
 				self.status.sprite_overflow = 0
+				self.status.sprite_zero_hit = 0
 				self.status.update_reg()
 
 				self.sprite_shifter_pattern_lo[:] = 0
-				self.sprite_shifter_pattern_lo[:] = 0
+				self.sprite_shifter_pattern_hi[:] = 0
 
 			# Prepare next sprite loop, first condition is while screen is being renderd, second is before jumping to top of screen
 			if (self.cycle >= 2 and self.cycle < 258) or (self.cycle >= 321 and self.cycle < 338):
@@ -601,12 +608,16 @@ cdef class PPU:
 				self.sprite_shifter_pattern_hi[:] = 0
 
 				self._n_OAM_entry = 0
+				self.sprite_zero_hit_possible = False
 
 				while self._n_OAM_entry < 64 and self.sprite_count < 9:
 					self._diff = self.scan_line - self.OAM[self._n_OAM_entry<<2 + 0]
 
 					if self._diff >= 0 and self._diff < (16 if self.ctrl.sprite_size else 8):
 						if self.sprite_count < 8:
+							if self._n_OAM_entry == 0:
+								self.sprite_zero_hit_possible = True
+
 							self.OAM_scanline[(self.sprite_count<<2):((self.sprite_count<<2)+4)] = self.OAM[(self._n_OAM_entry<<2):(self._n_OAM_entry<<2)+4]
 							self.sprite_count+=1
 
@@ -702,6 +713,7 @@ cdef class PPU:
 
 
 		if self.mask.render_sprites:
+			self.rendering_sprite_zero = False
 
 			for i in range(self.sprite_count):
 				if self.OAM_scanline[(i<<2)+3] == 0:
@@ -714,6 +726,8 @@ cdef class PPU:
 
 					# If we have found a sprite which will render infront of the background then we can stop since everything else is lower priority
 					if fg_pixel != 0:
+						if i == 0:
+							self.rendering_sprite_zero = True
 						break
 
 		# Find which pixel is to be chosen between background and foreground
@@ -733,6 +747,17 @@ cdef class PPU:
 			else:
 				pixel = bg_pixel
 				palette = bg_palette
+
+			if self.sprite_zero_hit_possible and self.rendering_sprite_zero:
+				if self.mask.render_background and self.mask.render_sprites:
+					if not (self.mask.render_background_left | self.mask.render_sprites_left):
+						if self.cycle >= 9 and self.cycle < 258:
+							self.status.sprite_zero_hit = 1
+							self.status.update_reg()
+					else:
+						if self.cycle >= 1 and self.cycle < 258:
+							self.status.sprite_zero_hit = 1
+							self.status.update_reg()
 
 
 		c = self.colours[self.ppu_read(0x3F00 + (palette<<2) + pixel)]
