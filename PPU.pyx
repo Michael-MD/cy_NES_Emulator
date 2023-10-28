@@ -11,6 +11,7 @@ import ctypes
 cdef extern from "stdint.h":
 	ctypedef unsigned char uint8_t
 	ctypedef unsigned short uint16_t
+	ctypedef short int16_t
 
 from libcpp cimport bool
 
@@ -251,6 +252,20 @@ cdef class PPU:
 	cdef object OAM
 	cdef uint8_t OAM_addr
 
+	cdef object OAM_scanline
+	cdef uint8_t sprite_count
+
+	cdef uint8_t _n_OAM_entry
+	cdef int16_t _diff
+
+	cdef object sprite_shifter_pattern_lo
+	cdef object sprite_shifter_pattern_hi
+
+	cdef uint8_t sprite_shifter_pattern_lo_bits
+	cdef uint8_t sprite_shifter_pattern_hi_bits
+	cdef uint16_t sprite_shifter_pattern_lo_addr
+	cdef uint16_t sprite_shifter_pattern_hi_addr
+
 	def __cinit__(self):
 		self.cartridge = None
 		self._screen = np.zeros((256, 240, 3), dtype=np.uint8)
@@ -303,6 +318,20 @@ cdef class PPU:
 		self.OAM = np.zeros(64*4)
 		self.OAM_addr = 0x00
 
+		self.OAM_scanline = np.zeros(8*4, dtype=np.uint8)
+		self.sprite_count = 0
+
+		self._n_OAM_entry = 0x00
+		self._diff = 0x0000
+
+		self.sprite_shifter_pattern_lo = np.zeros(8, dtype=np.uint8)
+		self.sprite_shifter_pattern_hi = np.zeros(8, dtype=np.uint8)
+
+		self.sprite_shifter_pattern_lo_bits = 0
+		self.sprite_shifter_pattern_lo_addr = 0
+		self.sprite_shifter_pattern_hi_bits = 0
+		self.sprite_shifter_pattern_hi_addr = 0
+
 	@property
 	def OAM(self):
 		return self.OAM
@@ -347,6 +376,13 @@ cdef class PPU:
 		self._bg_shifter_attr_lo = (self._bg_shifter_attr_lo&0xFF00) | (0xFF if (self._bg_next_tile_attr&0b01) else 0x00)
 		self._bg_shifter_attr_hi = (self._bg_shifter_attr_hi&0xFF00) | (0xFF if (self._bg_next_tile_attr&0b10) else 0x00)
 
+	def _flip_byte(self, b):
+		b = ((b & 0xF0) >> 4) | ((b & 0x0F) << 4)
+		b = ((b & 0xCC) >> 2) | ((b & 0x33) << 2)
+		b = ((b & 0xAA) >> 1) | ((b & 0x55) << 1)
+
+		return b
+
 	cpdef clock(self):
 		# https://www.nesdev.org/w/images/default/4/4f/Ppu.svg
 
@@ -366,6 +402,14 @@ cdef class PPU:
 					self._bg_shifter_pattern_hi <<= 1
 					self._bg_shifter_attr_lo <<= 1
 					self._bg_shifter_attr_hi <<= 1
+
+				if self.mask.render_sprites and self.cycle >= 1 and self.cycle < 258:
+					for i in range(self.sprite_count):
+						if self.OAM_scanline[(i<<2)+3] > 0:
+							self.OAM_scanline[(i<<2)+3]-=1
+						else:
+							self.sprite_shifter_pattern_lo[i] <<= 1
+							self.sprite_shifter_pattern_hi[i] <<= 1
 
 				if (self.cycle-1)%8 == 0:	# Read background tile byte from nametable
 					self._load_bg_shifters()
@@ -540,6 +584,86 @@ cdef class PPU:
 
 					self.loopy_v.update_reg()
 
+
+			# Foreground Rendering
+
+			# Sprite evaluation phase: Get sprites to be rendered on next scanline during blanking period
+			if self.cycle == 257 and self.scan_line >= 0:
+				# At beginning of scanline reset all sprite memory and count
+				self.sprite_count = 0
+				self.OAM_scanline[:] = 0xFF
+
+				self.sprite_shifter_pattern_lo[:] = 0
+				self.sprite_shifter_pattern_hi[:] = 0
+
+				self._n_OAM_entry = 0
+
+				while self._n_OAM_entry < 64 and self.sprite_count < 9:
+					self._diff = self.scan_line - self.OAM[self._n_OAM_entry<<2 + 0]
+
+					if self._diff >= 0 and self._diff < (16 if self.ctrl.sprite_size else 8):
+						if self.sprite_count < 8:
+							self.OAM_scanline[(self.sprite_count<<2):((self.sprite_count<<2)+4)] = self.OAM[(self._n_OAM_entry<<2):(self._n_OAM_entry<<2)+4]
+							self.sprite_count+=1
+
+					self._n_OAM_entry+=1
+
+				self.status.sprite_overflow = self.sprite_count > 8
+
+			# Get data from pattern memory for sprites to be drawn on next scan line
+			if self.cycle == 340:
+				for i in range(0,self.sprite_count*4, 4):
+					if not self.ctrl.sprite_size: # 8x8 sprite
+						if not (self.OAM_scanline[i+2]&0x80):	# Check if sprite flipped vertically
+							# Sprite is NOT flipped vertically
+							self.sprite_shifter_pattern_lo_addr = (
+																(self.ctrl.pattern_sprite<<12)
+																| (self.OAM_scanline[i+1] << 4)
+																| (self.scan_line - self.OAM_scanline[i+0])
+																)
+						else:
+							# Sprite is flipped vertically
+							self.sprite_shifter_pattern_lo_addr = ((self.ctrl.pattern_sprite<<12)
+																+ (self.OAM_scanline[i+1] << 4)
+																+ (7 - (self.scan_line - self.OAM_scanline[i+0])))
+
+					else: # 8x16 sprite
+						if not (self.OAM_scanline[i+2]&0x80):	# Check if sprite flipped vertically
+							# Sprite Not flipped verically
+							if self.scan_line - self.OAM_scanline[i] < 8: # Reading top half of tile
+								self.sprite_shifter_pattern_lo_addr = (((self.OAM_scanline[i+1]&1)<<12)
+																		| ((self.OAM_scanline[i+1]&0xFE) << 4)
+																		| (self.scan_line - self.OAM_scanline[i+0])&0x07)
+							else: # Reading bottom half of tile
+								self.sprite_shifter_pattern_lo_addr = (((self.OAM_scanline[i+1]&1)<<12)
+																		| (((self.OAM_scanline[i+1]&0xFE)+1) << 4)
+																		| (self.scan_line - self.OAM_scanline[i+0])&0x07)
+						else: # Sprite flipped vertically
+							if self.scan_line - self.OAM_scanline[i] < 8: # Reading top half of tile
+								self.sprite_shifter_pattern_lo_addr = (((self.OAM_scanline[i+1]&1)<<12)
+																		| (((self.OAM_scanline[i+1]&0xFE) + 1) << 4)
+																		| (7 - (self.scan_line - self.OAM_scanline[i+0])&0x07))
+							else: # Reading bottom half of tile
+								self.sprite_shifter_pattern_lo_addr = (((self.OAM_scanline[i+1]&1)<<12)
+																		| (((self.OAM_scanline[i+1]&0xFE)) << 4)
+																		| (7 - (self.scan_line - self.OAM_scanline[i+0])&0x07))
+
+					# Get pixel address from high bit plane
+					self.sprite_shifter_pattern_hi_addr = self.sprite_shifter_pattern_lo_addr + 8
+
+					# Get pixels for row of sprite data
+					self.sprite_shifter_pattern_lo_bits = self.ppu_read(self.sprite_shifter_pattern_lo_addr)	
+					self.sprite_shifter_pattern_hi_bits = self.ppu_read(self.sprite_shifter_pattern_hi_addr)	
+
+					# Flip sprites horizonally if necessary
+					if self.OAM_scanline[i + 2] & 0x40:
+						self.sprite_shifter_pattern_lo_bits = self._flip_byte(self.sprite_shifter_pattern_lo_bits)
+						self.sprite_shifter_pattern_hi_bits = self._flip_byte(self.sprite_shifter_pattern_hi_bits)
+
+					# Load tiles into shift registers
+					self.sprite_shifter_pattern_lo[i>>2] = self.sprite_shifter_pattern_lo_bits
+					self.sprite_shifter_pattern_hi[i>>2] = self.sprite_shifter_pattern_hi_bits
+
 		if self.scan_line >= 241 and self.scan_line < 261:
 			# Set vertical blank at scan line below bottom of page and set nmi i.e. emit interrupt
 			if self.scan_line == 241 and self.cycle == 1:	
@@ -550,8 +674,9 @@ cdef class PPU:
 				if self.ctrl.enable_nmi:
 					self.nmi = True
 
-		cdef uint8_t bg_pixel = 0
-		cdef uint8_t bg_palette = 0
+		# Combine background rendering information
+		cdef uint8_t bg_pixel, bg_palette
+		bg_pixel, bg_palette = 0, 0
 
 		cdef uint16_t bit_mux
 
@@ -566,7 +691,47 @@ cdef class PPU:
 			bg_pal1 = (self._bg_shifter_attr_hi&bit_mux) > 0
 			bg_palette = (bg_pal1<<1) | bg_pal0
 
-		c = self.colours[self.ppu_read(0x3F00 + (bg_palette<<2) + bg_pixel)]
+
+		# Combine foreground rendering information
+		cdef uint8_t fg_pixel, fg_palette, fg_priority
+		fg_pixel, fg_palette, fg_priority = 0, 0, 0
+
+
+		if self.mask.render_sprites:
+
+			for i in range(self.sprite_count):
+				if self.OAM_scanline[(i<<2)+3] == 0:
+					fg_p0_pixel = (self.sprite_shifter_pattern_lo[i]&0x80) > 0
+					fg_p1_pixel = (self.sprite_shifter_pattern_hi[i]&0x80) > 0
+					fg_pixel = (fg_p1_pixel<<1) | fg_p0_pixel
+
+					fg_palette = (self.OAM_scanline[(i<<2)+2] & 0x03) + 0x04
+					fg_priority = (self.OAM_scanline[(i<<2)+2] & 0x20) == 0 	# Priority of sprites with background
+
+					# If we have found a sprite which will render infront of the background then we can stop since everything else is lower priority
+					if fg_priority != 0:
+						break
+
+		# Find which pixel is to be chosen between background and foreground
+		if bg_pixel == 0 and fg_pixel == 0:
+			pixel = 0
+			palette = 0
+		elif bg_pixel == 0 and fg_pixel > 0:
+			pixel = fg_pixel
+			palette = fg_palette
+		elif bg_pixel > 0 and fg_pixel == 0:
+			pixel = bg_pixel
+			palette = bg_palette
+		else:
+			if fg_priority:
+				pixel = fg_pixel
+				palette = fg_palette
+			else:
+				pixel = bg_pixel
+				palette = bg_palette
+
+
+		c = self.colours[self.ppu_read(0x3F00 + (palette<<2) + pixel)]
 		if self.cycle <= 255 and self.scan_line <= 239:
 			self._screen[self.cycle-1, self.scan_line] = c
 
