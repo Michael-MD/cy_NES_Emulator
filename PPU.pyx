@@ -392,7 +392,11 @@ cdef class PPU:
 
 			if self.scan_line == -1 and self.cycle == 1:	# Unset vertical blank at top of page
 				self.status.vertical_blank = 0
+				self.status.sprite_overflow = 0
 				self.status.update_reg()
+
+				self.sprite_shifter_pattern_lo[:] = 0
+				self.sprite_shifter_pattern_lo[:] = 0
 
 			# Prepare next sprite loop, first condition is while screen is being renderd, second is before jumping to top of screen
 			if (self.cycle >= 2 and self.cycle < 258) or (self.cycle >= 321 and self.cycle < 338):
@@ -709,7 +713,7 @@ cdef class PPU:
 					fg_priority = (self.OAM_scanline[(i<<2)+2] & 0x20) == 0 	# Priority of sprites with background
 
 					# If we have found a sprite which will render infront of the background then we can stop since everything else is lower priority
-					if fg_priority != 0:
+					if fg_pixel != 0:
 						break
 
 		# Find which pixel is to be chosen between background and foreground
