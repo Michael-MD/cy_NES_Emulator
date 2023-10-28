@@ -380,8 +380,8 @@ cdef class CPU6502:
 			# Always set unused flag
 			self.set_flag(self.U, 1)
 
-		else:
-			self._cycles-=1
+		# else:
+		self._cycles-=1
 
 	# Print CPU internal state
 	def __str__(self):
