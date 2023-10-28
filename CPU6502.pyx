@@ -1,10 +1,7 @@
-# cython: boundscheck=False
-# cython: wraparound=False
-# cython: cdivision=True
-# cython: nonecheck=False
-# cython: initializedcheck=False
-# cython: overflowcheck=False
-# cython: cflags=-O3
+# cython: cflags=-O3, boundscheck=False, wraparound=False, cdivision=True, nonecheck=False, initializedcheck=False, overflowcheck=False
+
+
+
 
 from .Bus import Bus
 import numpy as np
@@ -483,7 +480,7 @@ cdef class CPU6502:
 	cdef uint8_t ABX(self):
 		self._addr_abs = self.read(self.pc) & 0x00FF	# Low byte
 		self.pc+=1
-		hi = (self.read(self.pc)<<8) 	# High byte
+		cdef uint16_t hi = (self.read(self.pc)<<8) 	# High byte
 		self._addr_abs |= hi
 		self.pc+=1
 		self._addr_abs += (self.x&0xFF)
@@ -516,7 +513,7 @@ cdef class CPU6502:
 		ptr_hi = self.read(self.pc)
 		self.pc+=1
 		
-		ptr = (ptr_hi<<8) | ptr_lo
+		cdef uint16_t ptr = (ptr_hi<<8) | ptr_lo
 
 		if ptr_lo == 0x00FF:
 			self._addr_abs = (self.read(ptr & 0xFF00)<<8) + self.read(ptr)
@@ -533,8 +530,8 @@ cdef class CPU6502:
 	cdef uint8_t IZX(self):
 		t = self.read(self.pc)
 		self.pc+=1
-		lo = self.read((t + self.x) & 0x00FF) 		# And discards carry
-		hi = self.read((t + self.x + 1) & 0x00FF) 	# And discards carry
+		cdef uint16_t lo = self.read((t + self.x) & 0x00FF) 		# And discards carry
+		cdef uint16_t hi = self.read((t + self.x + 1) & 0x00FF) 	# And discards carry
 		self._addr_abs = (hi<<8) | lo
 		return 0
 
@@ -546,8 +543,8 @@ cdef class CPU6502:
 	cdef uint8_t IZY(self):
 		t = self.read(self.pc)
 		self.pc+=1
-		lo = self.read(t & 0x00FF)
-		hi = self.read((t+1) & 0x00FF)
+		cdef uint16_t lo = self.read(t & 0x00FF)
+		cdef uint16_t hi = self.read((t+1) & 0x00FF)
 
 		self._addr_abs = (hi<<8) | lo
 		self._addr_abs += self.y

@@ -1,10 +1,6 @@
-# cython: boundscheck=False
-# cython: wraparound=False
-# cython: cdivision=True
-# cython: nonecheck=False
-# cython: initializedcheck=False
-# cython: overflowcheck=False
-# cython: cflags=-O3
+# cython: cflags=-O3, boundscheck=False, wraparound=False, cdivision=True, nonecheck=False, initializedcheck=False, overflowcheck=False
+
+
 
 from .Mapper cimport Mapper
 

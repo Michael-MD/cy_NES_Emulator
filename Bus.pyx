@@ -1,10 +1,7 @@
-# cython: boundscheck=False
-# cython: wraparound=False
-# cython: cdivision=True
-# cython: nonecheck=False
-# cython: initializedcheck=False
-# cython: overflowcheck=False
-# cython: cflags=-O3
+# cython: cflags=-O3, boundscheck=False, wraparound=False, cdivision=True, nonecheck=False, initializedcheck=False, overflowcheck=False
+
+
+
 
 import numpy as np
 
@@ -54,7 +51,7 @@ cdef class Bus:
 	def controller(self, v):
 		self._controller[0] = v
 
-	def clock(self):
+	cpdef void clock(self):
 		self.ppu.clock()
 		if self.n_system_clock_counter % 3 == 0:	# PPU clocked 3x faster than CPU
 			if self.dma_transfer:
@@ -95,10 +92,10 @@ cdef class Bus:
 		self.cartridge = cartridge
 		self.cartridge.connect_bus(self)
 
-	def write(self, addr: np.uint16, data: np.uint8):
+	cpdef void write(self, uint16_t addr, uint8_t data):
 		if self.cartridge.cpu_write(addr, data):		# Write to cartridge
 			"""
-			Since different mappers may accept and regect different 
+			Since different mappers may accept and reject different 
 			memmory ranges. We have the read and write return if the
 			value specified is in the cartridge addressable range.
 			"""
@@ -115,7 +112,7 @@ cdef class Bus:
 			self.dma_transfer = True
 			self.dma_dummy = True
 
-	def read(self, addr: np.uint16):
+	cpdef uint8_t read(self, uint16_t addr):
 		data, valid_addr = self.cartridge.cpu_read(addr)
 		if valid_addr:	# Read from cartridge
 			return data

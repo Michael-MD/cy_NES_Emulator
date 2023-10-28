@@ -1,10 +1,7 @@
-# cython: boundscheck=False
-# cython: wraparound=False
-# cython: cdivision=True
-# cython: nonecheck=False
-# cython: initializedcheck=False
-# cython: overflowcheck=False
-# cython: cflags=-O3
+# cython: cflags=-O3, boundscheck=False, wraparound=False, cdivision=True, nonecheck=False, initializedcheck=False, overflowcheck=False
+
+
+
 
 import numpy as np
 import ctypes
@@ -349,6 +346,14 @@ cdef class PPU:
 		self.rendering_sprite_zero = False
 
 	@property
+	def end_of_frame(self):
+		return self.end_of_frame
+
+	@end_of_frame.setter
+	def end_of_frame(self, v):
+		self.end_of_frame = v
+
+	@property
 	def OAM(self):
 		return self.OAM
 
@@ -392,14 +397,14 @@ cdef class PPU:
 		self._bg_shifter_attr_lo = (self._bg_shifter_attr_lo&0xFF00) | (0xFF if (self._bg_next_tile_attr&0b01) else 0x00)
 		self._bg_shifter_attr_hi = (self._bg_shifter_attr_hi&0xFF00) | (0xFF if (self._bg_next_tile_attr&0b10) else 0x00)
 
-	cdef uint8_t _flip_byte(self, uint8_t b):
+	cdef inline uint8_t _flip_byte(self, uint8_t b):
 		b = ((b & 0xF0) >> 4) | ((b & 0x0F) << 4)
 		b = ((b & 0xCC) >> 2) | ((b & 0x33) << 2)
 		b = ((b & 0xAA) >> 1) | ((b & 0x55) << 1)
 
 		return b
 
-	cpdef clock(self):
+	cpdef void clock(self):
 		# https://www.nesdev.org/w/images/default/4/4f/Ppu.svg
 		cdef int i
 		if self.scan_line >= -1 and self.scan_line < 240:	# Visible region of screen

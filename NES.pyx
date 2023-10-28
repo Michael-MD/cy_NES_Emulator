@@ -1,10 +1,7 @@
-# cython: boundscheck=False
-# cython: wraparound=False
-# cython: cdivision=True
-# cython: nonecheck=False
-# cython: initializedcheck=False
-# cython: overflowcheck=False
-# cython: cflags=-O3
+# cython: cflags=-O3, boundscheck=False, wraparound=False, cdivision=True, nonecheck=False, initializedcheck=False, overflowcheck=False
+
+
+
 
 import os
 import numpy as np
@@ -132,40 +129,43 @@ cdef class NES:
 
 	cpdef void run(self):
 		pygame.init()
-		self.screen = pygame.display.set_mode((256, 240), pygame.RESIZABLE)
-		self.screen.fill((0,0,1))
+		self.screen = pygame.display.set_mode((255, 239), pygame.RESIZABLE)
+		self.screen.fill((0,0,0))
 		self._clock = pygame.time.Clock()
+		image_surface = pygame.Surface((256, 240))
 
 		while True:
-			self.clock_system(100_000)
+			self.clock_system(100)
 
-			image_surface = pygame.surfarray.make_surface(self.ppu.screen)
-			self.screen.blit(image_surface, (0, 0))
+			if self.ppu.end_of_frame:
+				pygame.surfarray.blit_array(image_surface, self.ppu.screen)  # Update the Surface
+				self.screen.blit(image_surface, (0, 0))
+				pygame.display.update()
+				self.ppu.end_of_frame = False
 
 			self.bus.controller = 0
 			
+			keys = pygame.key.get_pressed()
+			if keys[pygame.K_UP]:
+				self.bus.controller |= 0x08
+			if keys[pygame.K_LEFT]:
+				self.bus.controller |= 0x02
+			if keys[pygame.K_DOWN]:
+				self.bus.controller |= 0x04
+			if keys[pygame.K_RIGHT]:
+				self.bus.controller |= 0x01
+			if keys[pygame.K_s]:
+				self.bus.controller |= 0x10
+			if keys[pygame.K_a]:
+				self.bus.controller |= 0x20
+			if keys[pygame.K_z]:
+				self.bus.controller |= 0x40
+			if keys[pygame.K_x]:
+				self.bus.controller |= 0x80
+
 			for event in pygame.event.get():
 				if event.type == pygame.QUIT:
 					pygame.quit()
 					exit()
 
-			keys = pygame.key.get_pressed()
-			if keys[pygame.K_UP]:
-				self.bus.controller = self.bus.controller | 0x08
-			if keys[pygame.K_LEFT]:
-				self.bus.controller = self.bus.controller | 0x02
-			if keys[pygame.K_DOWN]:
-				self.bus.controller = self.bus.controller | 0x04
-			if keys[pygame.K_RIGHT]:
-				self.bus.controller = self.bus.controller | 0x01
-			if keys[pygame.K_s]:
-				self.bus.controller = self.bus.controller | 0x10
-			if keys[pygame.K_a]:
-				self.bus.controller = self.bus.controller | 0x20
-			if keys[pygame.K_z]:
-				self.bus.controller = self.bus.controller | 0x40
-			if keys[pygame.K_x]:
-				self.bus.controller = self.bus.controller | 0x80
-
-			self._clock.tick(60)
-			pygame.display.update()
+			# self._clock.tick(60)				
