@@ -38,8 +38,6 @@ cdef class Bus:
 		self.dma_transfer = False
 		self.dma_dummy = True
 
-		self._entry = 0x00
-
 	@property
 	def controller(self):
 		return self._controller[0]
@@ -59,16 +57,8 @@ cdef class Bus:
 					if self.n_system_clock_counter % 2 == 0:
 						self.dma_data = self.read((self.dma_page<<8)|self.dma_addr)
 					else:
-						self._entry = (self.dma_addr & 64)
-						if self._entry == 0:
-							self.ppu.OAM[self.dma_addr>>2].y = self.dma_data
-						elif self._entry == 1:
-							self.ppu.OAM[self.dma_addr>>2].id = self.dma_data
-						elif self._entry == 2:
-							self.ppu.OAM[self.dma_addr>>2].attr = self.dma_data
-						elif self._entry == 3:
-							self.ppu.OAM[self.dma_addr>>2].x = self.dma_data
-
+						self.ppu.OAM[self.dma_addr] = self.dma_data
+						
 						self.dma_addr+=1
 
 						if self.dma_addr == 0x00:

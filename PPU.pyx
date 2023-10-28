@@ -200,13 +200,6 @@ cdef class Loopy:
 		)
 
 
-class OAMEntry:
-	def __init__(self, y, id, attr, x):
-		self.y = y
-		self.id = id
-		self.attr = attr
-		self.x = x
-
 cdef class PPU:
 	"""
 	The PPU has its own internal bus with three memories attached.
@@ -257,7 +250,6 @@ cdef class PPU:
 
 	cdef object OAM
 	cdef uint8_t OAM_addr
-	cdef uint8_t _entry
 
 	def __cinit__(self):
 		self.cartridge = None
@@ -308,9 +300,8 @@ cdef class PPU:
 
 		self.end_of_frame = False
 
-		self.OAM = np.full(64, OAMEntry(y=0, id=0, attr=0, x=0), dtype=OAMEntry)
+		self.OAM = np.zeros(64*4)
 		self.OAM_addr = 0x00
-		self._entry = 0x00
 
 	@property
 	def OAM(self):
@@ -666,15 +657,7 @@ cdef class PPU:
 		elif addr == 0x0003:		# OAM Address
 			self.OAM_addr = data
 		elif addr == 0x0004:		# OAM Data
-			self._entry = (self.OAM_addr & 64)
-			if self._entry == 0:
-				self.OAM[self.OAM_addr>>2].y = data
-			elif self._entry == 1:
-				self.OAM[self.OAM_addr>>2].id = data
-			elif self._entry == 2:
-				self.OAM[self.OAM_addr>>2].attr = data
-			elif self._entry == 3:
-				self.OAM[self.OAM_addr>>2].x = data
+			self.OAM[self.OAM_addr] = data
 
 		elif addr == 0x0005:		# Scroll
 			if self._address_latch == 0:
