@@ -1,6 +1,6 @@
 import numpy as np
 
-pal_screen = np.zeros([64,3], dtype=np.uint8)	# 64 bytes of available colours
+pal_screen = np.zeros((64,3), dtype=np.uint8)	# 64 bytes of available colours
 # Available PAL screen colours in RGB
 pal_screen[0x00] = [84, 84, 84]
 pal_screen[0x01] = [0, 30, 116]

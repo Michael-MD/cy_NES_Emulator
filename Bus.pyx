@@ -1,3 +1,11 @@
+# cython: boundscheck=False
+# cython: wraparound=False
+# cython: cdivision=True
+# cython: nonecheck=False
+# cython: initializedcheck=False
+# cython: overflowcheck=False
+# cython: cflags=-O3
+
 import numpy as np
 
 cdef extern from "stdint.h":

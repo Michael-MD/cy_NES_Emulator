@@ -1,3 +1,11 @@
+# cython: boundscheck=False
+# cython: wraparound=False
+# cython: cdivision=True
+# cython: nonecheck=False
+# cython: initializedcheck=False
+# cython: overflowcheck=False
+# cython: cflags=-O3
+
 import numpy as np
 import ctypes
 c_uint8 = ctypes.c_uint8
@@ -12,6 +20,7 @@ cdef extern from "stdint.h":
 	ctypedef unsigned char uint8_t
 	ctypedef unsigned short uint16_t
 	ctypedef short int16_t
+
 
 from libcpp cimport bool
 
@@ -211,7 +220,7 @@ cdef class PPU:
 	0x3FFF.
 	"""
 	cdef object cartridge
-	cdef object _screen
+	cdef object screen
 
 	cdef int cycle
 	cdef int scan_line
@@ -229,11 +238,11 @@ cdef class PPU:
 	cdef uint8_t nmi
 
 	cdef object nametable
-	cdef object nametable_a
-	cdef object nametable_b
-	cdef object palettes
+	cdef uint8_t[:,:] nametable_a
+	cdef uint8_t[:,:] nametable_b
+	cdef uint8_t[:] palettes
 
-	cdef object colours
+	cdef uint8_t[:,:] colours
 
 	cdef uint8_t _v_mirroring
 
@@ -249,17 +258,17 @@ cdef class PPU:
 
 	cdef uint8_t end_of_frame
 
-	cdef object OAM
+	cdef uint8_t[:] OAM
 	cdef uint8_t OAM_addr
 
-	cdef object OAM_scanline
+	cdef uint8_t[:] OAM_scanline
 	cdef uint8_t sprite_count
 
 	cdef uint8_t _n_OAM_entry
 	cdef int16_t _diff
 
-	cdef object sprite_shifter_pattern_lo
-	cdef object sprite_shifter_pattern_hi
+	cdef uint8_t[:] sprite_shifter_pattern_lo
+	cdef uint8_t[:] sprite_shifter_pattern_hi
 
 	cdef uint8_t sprite_shifter_pattern_lo_bits
 	cdef uint8_t sprite_shifter_pattern_hi_bits
@@ -269,9 +278,10 @@ cdef class PPU:
 	cdef uint8_t sprite_zero_hit_possible
 	cdef uint8_t rendering_sprite_zero
 
+
 	def __cinit__(self):
 		self.cartridge = None
-		self._screen = np.zeros((256, 240, 3), dtype=np.uint8)
+		self.screen = np.zeros((256, 240, 3), dtype=np.uint8)
 
 		# Populating screen
 		self.cycle = 0 	# Column
@@ -318,7 +328,7 @@ cdef class PPU:
 
 		self.end_of_frame = False
 
-		self.OAM = np.zeros(64*4)
+		self.OAM = np.zeros(64*4, dtype=np.uint8)
 		self.OAM_addr = 0x00
 
 		self.OAM_scanline = np.zeros(8*4, dtype=np.uint8)
@@ -344,7 +354,7 @@ cdef class PPU:
 
 	@property
 	def screen(self):
-		return self._screen
+		return self.screen
 
 	@property
 	def nmi(self):
@@ -382,7 +392,7 @@ cdef class PPU:
 		self._bg_shifter_attr_lo = (self._bg_shifter_attr_lo&0xFF00) | (0xFF if (self._bg_next_tile_attr&0b01) else 0x00)
 		self._bg_shifter_attr_hi = (self._bg_shifter_attr_hi&0xFF00) | (0xFF if (self._bg_next_tile_attr&0b10) else 0x00)
 
-	def _flip_byte(self, b):
+	cdef uint8_t _flip_byte(self, uint8_t b):
 		b = ((b & 0xF0) >> 4) | ((b & 0x0F) << 4)
 		b = ((b & 0xCC) >> 2) | ((b & 0x33) << 2)
 		b = ((b & 0xAA) >> 1) | ((b & 0x55) << 1)
@@ -391,7 +401,7 @@ cdef class PPU:
 
 	cpdef clock(self):
 		# https://www.nesdev.org/w/images/default/4/4f/Ppu.svg
-
+		cdef int i
 		if self.scan_line >= -1 and self.scan_line < 240:	# Visible region of screen
 			if self.scan_line == 0 and self.cycle == 0:
 				self.cycle = 1
@@ -694,6 +704,7 @@ cdef class PPU:
 		bg_pixel, bg_palette = 0, 0
 
 		cdef uint16_t bit_mux
+		cdef uint8_t p0_pixel, p1_pixel, bg_pal0, bg_pal1
 
 		if self.mask.render_background:
 			bit_mux = 0x8000 >> self.fine_x
@@ -711,6 +722,7 @@ cdef class PPU:
 		cdef uint8_t fg_pixel, fg_palette, fg_priority
 		fg_pixel, fg_palette, fg_priority = 0, 0, 0
 
+		cdef uint8_t fg_p0_pixel, fg_p1_pixel
 
 		if self.mask.render_sprites:
 			self.rendering_sprite_zero = False
@@ -731,6 +743,7 @@ cdef class PPU:
 						break
 
 		# Find which pixel is to be chosen between background and foreground
+		cdef uint8_t pixel, palette
 		if bg_pixel == 0 and fg_pixel == 0:
 			pixel = 0
 			palette = 0
@@ -762,7 +775,7 @@ cdef class PPU:
 
 		c = self.colours[self.ppu_read(0x3F00 + (palette<<2) + pixel)]
 		if self.cycle <= 255 and self.scan_line <= 239:
-			self._screen[self.cycle-1, self.scan_line] = c
+			self.screen[self.cycle-1, self.scan_line] = c
 
 		self.cycle+=1 	# Scan across screen
 		if self.cycle >= 341:	# Finished columns

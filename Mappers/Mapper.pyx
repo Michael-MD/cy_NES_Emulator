@@ -1,3 +1,11 @@
+# cython: boundscheck=False
+# cython: wraparound=False
+# cython: cdivision=True
+# cython: nonecheck=False
+# cython: initializedcheck=False
+# cython: overflowcheck=False
+# cython: cflags=-O3
+
 cdef extern from "stdint.h":
 	ctypedef unsigned char uint8_t
 	ctypedef unsigned short uint16_t
