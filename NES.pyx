@@ -7,8 +7,8 @@ import numpy as np
 import pygame
 
 from .CPU6502 cimport CPU6502
+from .Cartridge cimport Cartridge
 from .Bus import Bus
-from .Cartridge import Cartridge
 from .PPU cimport PPU
 from .Mappers import Mapper000
 
@@ -25,7 +25,7 @@ cdef class NES:
 
 	cdef uint8_t n_mapper_ID
 
-	cdef object cart
+	cdef Cartridge cart
 	cdef object bus
 	cdef CPU6502 cpu
 	cdef PPU ppu
@@ -41,6 +41,7 @@ cdef class NES:
 			raise ValueError('ines file format only (.nes).')
 
 		# Read .nes file
+		cdef uint8_t[:] rom
 		with open(rom_directory, "rb") as rom_file:
 			rom = np.fromfile(rom_file, dtype=np.uint8)
 
@@ -87,8 +88,8 @@ cdef class NES:
 		v_prog_memory_end = v_prog_memory_start + (n_prog_chunks*16*1024)
 		v_char_memory_start = v_prog_memory_end
 		v_char_memory_end = v_char_memory_start + (n_char_chunks*8*1024)
-		self.cart.v_prog_memory = rom[v_prog_memory_start:v_prog_memory_end]
-		self.cart.v_char_memory = rom[v_char_memory_start:v_char_memory_end]
+		self.cart.v_prog_memory[:] = rom[v_prog_memory_start:v_prog_memory_end]
+		self.cart.v_char_memory[:] = rom[v_char_memory_start:v_char_memory_end]
 
 		# Set up NES system components
 		self.bus = Bus()
@@ -128,7 +129,7 @@ cdef class NES:
 		image_surface = pygame.Surface((256, 240))
 
 		while True:
-			self.clock_system(10_000)
+			self.clock_system(100_000)
 
 			# if self.ppu.end_of_frame:
 			# self.ppu.end_of_frame = False

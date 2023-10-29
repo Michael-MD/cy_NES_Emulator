@@ -314,6 +314,7 @@ cdef class CPU6502:
 
 	# Triggers clock cycle
 	cpdef void clock(self):
+		cdef uint8_t additional_clock_cycle_1, additional_clock_cycle_2
 		if self._cycles == 0: 	# Next instruction ready
 			# Service interrupts first
 			if self._nm_interrupt:

@@ -3,6 +3,8 @@ cdef extern from "stdint.h":
 	ctypedef unsigned short uint16_t
 	ctypedef short int16_t
 
+from .Cartridge cimport Cartridge
+
 cdef class Ctrl:
 	cdef uint8_t nametable_x
 	cdef uint8_t nametable_y
@@ -55,7 +57,6 @@ cdef class Loopy:
 
 	cdef void update_reg(self)
 
-	
 
 cdef class PPU:
 	"""
@@ -66,7 +67,7 @@ cdef class PPU:
 	Palette memory which stores color information located in range 0x3F00 to 
 	0x3FFF.
 	"""
-	cdef object cartridge
+	cdef Cartridge cartridge
 	cdef object screen
 
 	cdef int cycle

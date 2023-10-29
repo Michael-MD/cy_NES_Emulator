@@ -1,33 +1,10 @@
 # cython: cflags=-O3, boundscheck=False, wraparound=False, cdivision=True, nonecheck=False, initializedcheck=False, overflowcheck=False
 
-
-
-
 import numpy as np
 from .Bus import Bus
 
-cdef extern from "stdint.h":
-	ctypedef unsigned char uint8_t
-	ctypedef unsigned short uint16_t
-
-
 cdef class Cartridge:
-	"""
-	Pattern (char) memory which contains sprite informations is located 
-	at address range 0x0000 to 0x1FFF.
-	"""
-	cdef object bus
-	cdef object ppu
-	cdef object mapper
-
-	cdef uint8_t n_prog_chunks
-	cdef uint8_t n_char_chunks
-	cdef object _v_prog_memory
-	cdef object _v_char_memory	
-
 	def __cinit__(self, uint8_t n_prog_chunks, uint8_t n_char_chunks):
-		self.bus = None
-		self.ppu = None
 		self.mapper = None
 
 		self.n_prog_chunks = n_prog_chunks
@@ -48,53 +25,42 @@ cdef class Cartridge:
 
 	@property
 	def v_prog_memory(self):
-		return None
-
-	@v_prog_memory.setter
-	def v_prog_memory(self, v):
-		self._v_prog_memory[:] = v
+		return self._v_prog_memory
 
 	@property
 	def v_char_memory(self):
-		return None
-
-	@v_char_memory.setter
-	def v_char_memory(self, v):
-		self._v_char_memory[:] = v
+		return self._v_char_memory
 
 	# Connect Components
-	def connect_bus(self, bus):
-		self.bus = bus
-
-	def connect_ppu(self, ppu):
-		self.ppu = ppu
-
 	def connect_mapper(self, mapper):
 		self.mapper = mapper
 
 	# PPU with internal bus communication
-	cpdef uint8_t ppu_write(self, uint16_t addr, uint8_t data):
+	cdef uint8_t ppu_write(self, uint16_t addr, uint8_t data):
 		mapped_addr, valid_addr = self.mapper.ppu_map_write(addr, data)
 		if valid_addr:	
 			self._v_char_memory[mapped_addr] = data
 			return True
 		return False
 		
-	def ppu_read(self, addr):
+	cdef uint8_t ppu_read(self, uint16_t addr, uint8_t* data):
 		mapped_addr, valid_addr = self.mapper.ppu_map_read(addr)
-		if valid_addr:			
-			return self._v_char_memory[mapped_addr], True
-		return 0x00, False
+		if valid_addr:
+			data[0] = self._v_char_memory[mapped_addr]	
+			return True
+
+		data[0] = 0x00
+		return False
 
 	# CPU-Cart registers communication
-	def cpu_write(self, addr, data):
+	cpdef uint8_t cpu_write(self, uint16_t addr, uint8_t data):
 		mapped_addr, valid_addr = self.mapper.cpu_map_write(addr, data)
 		if valid_addr:
 			self._v_prog_memory[mapped_addr] = data
 			return True
 		return False
 		
-	def cpu_read(self, addr, bReadOnly: bool = False):
+	def cpu_read(self, addr):
 		mapped_addr, valid_addr = self.mapper.cpu_map_read(addr)
 		if valid_addr:
 			return self._v_prog_memory[mapped_addr], True

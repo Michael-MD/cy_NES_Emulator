@@ -1,8 +1,6 @@
 # cython: cflags=-O3, boundscheck=False, wraparound=False, cdivision=True, nonecheck=False, initializedcheck=False, overflowcheck=False
 
 
-
-
 import numpy as np
 import ctypes
 c_uint8 = ctypes.c_uint8
@@ -691,7 +689,6 @@ cdef class PPU:
 	# Connect Components
 	def connect_cartridge(self, cartridge):
 		self.cartridge = cartridge
-		cartridge.connect_ppu(self)
 
 	# PPU with internal bus communication
 	cpdef void ppu_write(self, uint16_t addr, uint8_t data):
@@ -724,7 +721,8 @@ cdef class PPU:
 
 	cpdef uint8_t ppu_read(self, uint16_t addr):
 		addr &= 0x3FFF	# Ensure in addressable range of PPU bus
-		data, valid_addr = self.cartridge.ppu_read(addr)
+		cdef uint8_t data
+		valid_addr = self.cartridge.ppu_read(addr, &data)
 		if valid_addr:	# Read from cartridge (Pattern Memory)
 			...
 		elif (addr >= 0x2000) and (addr <= 0x3EFF):		# Name table memory

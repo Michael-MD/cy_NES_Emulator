@@ -94,7 +94,6 @@ cdef class Bus:
 
 	def connect_cartridge(self, cartridge):
 		self.cartridge = cartridge
-		self.cartridge.connect_bus(self)
 
 	cpdef void write(self, uint16_t addr, uint8_t data):
 		if self.cartridge.cpu_write(addr, data):		# Write to cartridge
