@@ -2,7 +2,8 @@
 
 
 
-
+from .PPU cimport PPU
+from .CPU6502 cimport CPU6502
 import numpy as np
 
 cdef extern from "stdint.h":
@@ -10,8 +11,8 @@ cdef extern from "stdint.h":
 	ctypedef unsigned short uint16_t
 
 cdef class Bus:
-	cdef object cpu
-	cdef object ppu
+	cdef CPU6502 cpu
+	cdef PPU ppu
 	cdef object cartridge
 	cdef uint8_t cpu_ram[2048]
 	cdef int n_system_clock_counter

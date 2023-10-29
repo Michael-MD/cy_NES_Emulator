@@ -1,8 +1,6 @@
 # cython: cflags=-O3, boundscheck=False, wraparound=False, cdivision=True, nonecheck=False, initializedcheck=False, overflowcheck=False
 
 
-
-
 import os
 import numpy as np
 import pygame

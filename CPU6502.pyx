@@ -7,11 +7,6 @@ from .Bus import Bus
 import numpy as np
 from enum import Enum
 
-cdef extern from "stdint.h":
-	ctypedef unsigned char uint8_t
-	ctypedef unsigned short uint16_t
-
-
 class Instruction:
 	def __init__(self, name: str, opcode, addr_mode, cycles: int):
 		self.name = name
@@ -20,41 +15,6 @@ class Instruction:
 		self.cycles = cycles
 
 cdef class CPU6502:
-	"""
-	Implements high level 6502 CPU. 
-	Datasheet: http://datasheets.chipdb.org/Rockwell/6502.pdf
-	Instruction Set: https://www.pagetable.com/c64ref/6502/?tab=0
-	Assembler: https://www.masswerk.at/6502/assembler.html
-	"""
-	cdef uint8_t a
-	cdef uint8_t x
-	cdef uint8_t y
-	cdef uint8_t stkp
-	cdef uint16_t pc
-	cdef uint8_t status
-	
-	cdef uint8_t _interrupt
-	cdef uint8_t _nm_interrupt
-	
-	cdef object bus
-	
-	cdef uint16_t _fetched
-	cdef uint16_t _addr_abs
-	cdef uint16_t _addr_rel
-	cdef uint8_t _opcode
-	cdef uint8_t _cycles
-	cdef object lookup
-	cdef object instruction
-
-	cdef uint8_t C
-	cdef uint8_t Z
-	cdef uint8_t I
-	cdef uint8_t D
-	cdef uint8_t B
-	cdef uint8_t U
-	cdef uint8_t V
-	cdef uint8_t N
-
 	def __init__(self):
 		self.a = 0x00 		# Accumulator Register
 		self.x = 0x00 		# X Register
@@ -353,7 +313,7 @@ cdef class CPU6502:
 		self._cycles = 8
 
 	# Triggers clock cycle
-	def clock(self):
+	cpdef void clock(self):
 		if self._cycles == 0: 	# Next instruction ready
 			# Service interrupts first
 			if self._nm_interrupt:
