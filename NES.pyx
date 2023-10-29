@@ -1,3 +1,4 @@
+# cython: profile=True
 # cython: cflags=-O3, boundscheck=False, wraparound=False, cdivision=True, nonecheck=False, initializedcheck=False, overflowcheck=False
 
 
@@ -5,10 +6,10 @@ import os
 import numpy as np
 import pygame
 
-from .CPU6502 import CPU6502
+from .CPU6502 cimport CPU6502
 from .Bus import Bus
 from .Cartridge import Cartridge
-from .PPU import PPU
+from .PPU cimport PPU
 from .Mappers import Mapper000
 
 cdef extern from "stdint.h":
@@ -26,8 +27,8 @@ cdef class NES:
 
 	cdef object cart
 	cdef object bus
-	cdef object cpu
-	cdef object ppu
+	cdef CPU6502 cpu
+	cdef PPU ppu
 
 	cdef object screen
 	cdef object _clock
@@ -116,15 +117,9 @@ cdef class NES:
 	def reset(self):
 		self.cpu.reset()
 
-	cdef void clock(self):
-		self.bus.clock()
-
 	cdef void clock_system(self, N=3):
-		# Clock CPU one instruction
-		cdef int i
-		for i in range(N):
-			self.clock()
-
+		self.bus.clock(N)
+			
 	cpdef void run(self):
 		pygame.init()
 		self.screen = pygame.display.set_mode((255, 239), pygame.RESIZABLE)
@@ -133,13 +128,13 @@ cdef class NES:
 		image_surface = pygame.Surface((256, 240))
 
 		while True:
-			self.clock_system(100)
+			self.clock_system(10_000)
 
-			if self.ppu.end_of_frame:
-				pygame.surfarray.blit_array(image_surface, self.ppu.screen)  # Update the Surface
-				self.screen.blit(image_surface, (0, 0))
-				pygame.display.update()
-				self.ppu.end_of_frame = False
+			# if self.ppu.end_of_frame:
+			# self.ppu.end_of_frame = False
+			pygame.surfarray.blit_array(image_surface, self.ppu.screen)  # Update the Surface
+			self.screen.blit(image_surface, (0, 0))
+			pygame.display.update()
 
 			self.bus.controller = 0
 			

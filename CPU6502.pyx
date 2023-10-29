@@ -240,7 +240,7 @@ cdef class CPU6502:
 	def set_irq(self, v):
 		self._interrupt = True if v else False
 
-	def set_nmi(self, v):
+	cdef void set_nmi(self, uint8_t v):
 		self._nm_interrupt = True if v else False
 
 	# Reset

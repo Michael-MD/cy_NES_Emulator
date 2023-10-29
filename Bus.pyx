@@ -52,33 +52,36 @@ cdef class Bus:
 	def controller(self, v):
 		self._controller[0] = v
 
-	cpdef void clock(self):
-		self.ppu.clock()
-		if self.n_system_clock_counter % 3 == 0:	# PPU clocked 3x faster than CPU
-			if self.dma_transfer:
-				if self.dma_dummy:
-					if self.n_system_clock_counter % 2 == 1:
-						self.dma_dummy = False
-				else:
-					if self.n_system_clock_counter % 2 == 0:
-						self.dma_data = self.read((self.dma_page<<8)|self.dma_addr)
+	cpdef void clock(self, int N=1):
+		cdef int i
+		for i in range(N):
+			
+			self.ppu.clock()
+			if self.n_system_clock_counter % 3 == 0:	# PPU clocked 3x faster than CPU
+				if self.dma_transfer:
+					if self.dma_dummy:
+						if self.n_system_clock_counter % 2 == 1:
+							self.dma_dummy = False
 					else:
-						self.ppu.OAM[self.dma_addr] = self.dma_data
-						
-						self.dma_addr+=1
+						if self.n_system_clock_counter % 2 == 0:
+							self.dma_data = self.read((self.dma_page<<8)|self.dma_addr)
+						else:
+							self.ppu.OAM[self.dma_addr] = self.dma_data
+							
+							self.dma_addr+=1
 
-						if self.dma_addr == 0x00:
-							self.dma_transfer = False
-							self.dma_dummy = True
+							if self.dma_addr == 0x00:
+								self.dma_transfer = False
+								self.dma_dummy = True
 
-			else:
-				self.cpu.clock()
+				else:
+					self.cpu.clock()
 
-		if self.ppu.nmi:
-			self.ppu.nmi = False
-			self.cpu.set_nmi(1)
+			if self.ppu.nmi:
+				self.ppu.nmi = False
+				self.cpu.set_nmi(1)
 
-		self.n_system_clock_counter+=1
+			self.n_system_clock_counter+=1
 
 	# Connect Components
 	def connect_cpu(self, cpu):

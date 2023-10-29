@@ -40,6 +40,7 @@ cdef class CPU6502:
 	cdef uint8_t N
 
 	cdef void fetch(self)
+	cdef void set_nmi(self, uint8_t v)
 	
 	cdef void write(self, uint16_t addr, uint8_t data)
 	cdef uint8_t read(self, uint16_t addr)
