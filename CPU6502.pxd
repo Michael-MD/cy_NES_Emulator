@@ -2,6 +2,8 @@ cdef extern from "stdint.h":
 	ctypedef unsigned char uint8_t
 	ctypedef unsigned short uint16_t
 
+from .Bus cimport Bus
+
 
 cdef class CPU6502:
 	"""
@@ -20,7 +22,7 @@ cdef class CPU6502:
 	cdef uint8_t _interrupt
 	cdef uint8_t _nm_interrupt
 	
-	cdef object bus
+	cdef Bus bus
 	
 	cdef uint16_t _fetched
 	cdef uint16_t _addr_abs

@@ -6,7 +6,7 @@ import pygame
 
 from .CPU6502 cimport CPU6502
 from .Cartridge cimport Cartridge
-from .Bus import Bus
+from .Bus cimport Bus
 from .PPU cimport PPU
 from .Mappers import Mapper000
 
@@ -24,7 +24,7 @@ cdef class NES:
 	cdef uint8_t n_mapper_ID
 
 	cdef Cartridge cart
-	cdef object bus
+	cdef Bus bus
 	cdef CPU6502 cpu
 	cdef PPU ppu
 
