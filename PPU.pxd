@@ -128,8 +128,8 @@ cdef class PPU:
 
 	cdef void _load_bg_shifters(self)
 	cdef inline uint8_t _flip_byte(self, uint8_t b)
-	cpdef void clock(self)
-	cpdef void ppu_write(self, uint16_t addr, uint8_t data)
-	cpdef uint8_t ppu_read(self, uint16_t addr)
-	cpdef void cpu_write(self, uint16_t addr, uint8_t data)
-	cpdef uint8_t cpu_read(self, uint16_t addr)
+	cdef void clock(self)
+	cdef void ppu_write(self, uint16_t addr, uint8_t data)
+	cdef uint8_t ppu_read(self, uint16_t addr)
+	cdef void cpu_write(self, uint16_t addr, uint8_t data)
+	cdef uint8_t cpu_read(self, uint16_t addr)

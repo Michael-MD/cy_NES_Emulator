@@ -1,31 +1,13 @@
 # cython: cflags=-O3, boundscheck=False, wraparound=False, cdivision=True, nonecheck=False, initializedcheck=False, overflowcheck=False
 
-
-
-from .PPU cimport PPU
-from .CPU6502 cimport CPU6502
-import numpy as np
-
 cdef extern from "stdint.h":
 	ctypedef unsigned char uint8_t
 	ctypedef unsigned short uint16_t
 
+
+import numpy as np
+
 cdef class Bus:
-	cdef CPU6502 cpu
-	cdef PPU ppu
-	cdef object cartridge
-	cdef uint8_t cpu_ram[2048]
-	cdef int n_system_clock_counter
-	cdef uint8_t _controller[2]
-	cdef uint8_t _controller_state[2]
-
-	cdef uint8_t dma_page
-	cdef uint8_t dma_addr
-	cdef uint8_t dma_transfer
-	cdef uint8_t dma_dummy
-	cdef uint8_t dma_data
-	cdef uint8_t _entry
-
 	def __cinit__(self):
 		self.cpu = None
 		self.ppu = None
@@ -52,7 +34,7 @@ cdef class Bus:
 	def controller(self, v):
 		self._controller[0] = v
 
-	cpdef void clock(self, int N=1):
+	cpdef void clock(self, int N):
 		cdef int i
 		for i in range(N):
 			

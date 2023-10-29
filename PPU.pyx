@@ -299,7 +299,7 @@ cdef class PPU:
 
 		return b
 
-	cpdef void clock(self):
+	cdef void clock(self):
 		# https://www.nesdev.org/w/images/default/4/4f/Ppu.svg
 		cdef int i
 		if self.scan_line >= -1 and self.scan_line < 240:	# Visible region of screen
@@ -691,7 +691,7 @@ cdef class PPU:
 		self.cartridge = cartridge
 
 	# PPU with internal bus communication
-	cpdef void ppu_write(self, uint16_t addr, uint8_t data):
+	cdef void ppu_write(self, uint16_t addr, uint8_t data):
 		addr &= 0x3FFF	# Ensure in addressable range
 		if self.cartridge.ppu_write(addr, data):		# Write to cartridge
 			...
@@ -719,7 +719,7 @@ cdef class PPU:
 			if addr == 0x1C: addr = 0x000C
 			self.palettes[addr] = data
 
-	cpdef uint8_t ppu_read(self, uint16_t addr):
+	cdef uint8_t ppu_read(self, uint16_t addr):
 		addr &= 0x3FFF	# Ensure in addressable range of PPU bus
 		cdef uint8_t data
 		valid_addr = self.cartridge.ppu_read(addr, &data)
@@ -752,7 +752,7 @@ cdef class PPU:
 		return data
 
 	# CPU to PPU registers communication 
-	cpdef void cpu_write(self, uint16_t addr, uint8_t data):
+	cdef void cpu_write(self, uint16_t addr, uint8_t data):
 		if addr == 0x0000:			# Control
 			self.ctrl.reg = data
 			self.loopy_t.nametable_x = self.ctrl.nametable_x
@@ -791,7 +791,7 @@ cdef class PPU:
 			self.ppu_write(self.loopy_v._reg, data)
 			self.loopy_v.reg += (32 if self.ctrl.increment_mode else 1)
 
-	cpdef uint8_t cpu_read(self, uint16_t addr):
+	cdef uint8_t cpu_read(self, uint16_t addr):
 		data = 0x00
 		if addr == 0x0000:			# Control
 			...	# Not readable

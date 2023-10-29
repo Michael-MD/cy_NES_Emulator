@@ -1,8 +1,6 @@
 # cython: cflags=-O3, boundscheck=False, wraparound=False, cdivision=True, nonecheck=False, initializedcheck=False, overflowcheck=False
 
 
-
-
 cdef extern from "stdint.h":
 	ctypedef unsigned char uint8_t
 	ctypedef unsigned short uint16_t
