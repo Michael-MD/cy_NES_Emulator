@@ -126,7 +126,6 @@ cdef class NES:
 		self._clock = pygame.time.Clock()
 		image_surface = pygame.Surface((256, 240))
 
-		i = 0
 		a = np.zeros((256, 240, 3), dtype=np.uint8)
 
 		while True:
@@ -165,7 +164,3 @@ cdef class NES:
 					exit()
 
 			self._clock.tick(60)
-
-			i+= 1
-			if i %20:
-				print(self._clock.get_fps())				
