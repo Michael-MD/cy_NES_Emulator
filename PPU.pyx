@@ -241,30 +241,6 @@ cdef class PPU:
 		self.rendering_sprite_zero = False
 
 	@property
-	def end_of_frame(self):
-		return self.end_of_frame
-
-	@end_of_frame.setter
-	def end_of_frame(self, v):
-		self.end_of_frame = v
-
-	@property
-	def OAM(self):
-		return self.OAM
-
-	@property
-	def screen(self):
-		return self.screen
-
-	@property
-	def nmi(self):
-		return self.nmi
-
-	@nmi.setter
-	def nmi(self, v):
-		self.nmi = v
-
-	@property
 	def v_mirroring(self):
 		return self._v_mirroring
 
@@ -673,9 +649,9 @@ cdef class PPU:
 							self.status.update_reg()
 
 
-		c = self.colours[self.ppu_read(0x3F00 + (palette<<2) + pixel)]
-		if self.cycle <= 255 and self.scan_line <= 239:
-			self.screen[self.cycle-1, self.scan_line] = c
+		cdef uint8_t[:] c = self.colours[self.ppu_read(0x3F00 + (palette<<2) + pixel)]
+		if self.cycle <= 255 and self.scan_line <= 239 and self.scan_line >= 0:
+			self.screen[self.cycle, self.scan_line, :] = c[:]
 
 		self.cycle+=1 	# Scan across screen
 		if self.cycle >= 341:	# Finished columns

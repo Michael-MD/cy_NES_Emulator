@@ -68,7 +68,7 @@ cdef class PPU:
 	0x3FFF.
 	"""
 	cdef Cartridge cartridge
-	cdef object screen
+	cdef readonly uint8_t[:,:,:] screen
 
 	cdef int cycle
 	cdef int scan_line
@@ -83,7 +83,7 @@ cdef class PPU:
 	cdef uint8_t data
 	cdef uint8_t _address_latch
 	cdef uint8_t _ppu_data_buffer
-	cdef uint8_t nmi
+	cdef public uint8_t nmi
 
 	cdef object nametable
 	cdef uint8_t[:,:] nametable_a
@@ -104,9 +104,9 @@ cdef class PPU:
 	cdef uint16_t _bg_shifter_attr_lo
 	cdef uint16_t _bg_shifter_attr_hi
 
-	cdef uint8_t end_of_frame
+	cdef public uint8_t end_of_frame
 
-	cdef uint8_t[:] OAM
+	cdef public uint8_t[:] OAM
 	cdef uint8_t OAM_addr
 
 	cdef uint8_t[:] OAM_scanline

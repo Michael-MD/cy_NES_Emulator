@@ -37,7 +37,6 @@ cdef class Bus:
 	cpdef void clock(self, int N):
 		cdef int i
 		for i in range(N):
-			
 			self.ppu.clock()
 			if self.n_system_clock_counter % 3 == 0:	# PPU clocked 3x faster than CPU
 				if self.dma_transfer:

@@ -37,6 +37,8 @@ cdef class Cartridge:
 
 	# PPU with internal bus communication
 	cdef uint8_t ppu_write(self, uint16_t addr, uint8_t data):
+		cdef uint16_t mapped_addr 
+		cdef uint8_t valid_addr
 		mapped_addr, valid_addr = self.mapper.ppu_map_write(addr, data)
 		if valid_addr:	
 			self._v_char_memory[mapped_addr] = data
@@ -44,6 +46,8 @@ cdef class Cartridge:
 		return False
 		
 	cdef uint8_t ppu_read(self, uint16_t addr, uint8_t* data):
+		cdef uint16_t mapped_addr 
+		cdef uint8_t valid_addr
 		mapped_addr, valid_addr = self.mapper.ppu_map_read(addr)
 		if valid_addr:
 			data[0] = self._v_char_memory[mapped_addr]	
@@ -54,13 +58,17 @@ cdef class Cartridge:
 
 	# CPU-Cart registers communication
 	cpdef uint8_t cpu_write(self, uint16_t addr, uint8_t data):
-		mapped_addr, valid_addr = self.mapper.cpu_map_write(addr, data)
+		cdef uint16_t mapped_addr 
+		cdef uint8_t valid_addr
+		mapped_addr, valid_addr = self.mapper.cpu_map_write(addr)
 		if valid_addr:
 			self._v_prog_memory[mapped_addr] = data
 			return True
 		return False
 		
-	def cpu_read(self, addr):
+	cpdef (uint8_t, uint8_t) cpu_read(self, uint16_t addr):
+		cdef uint16_t mapped_addr 
+		cdef uint8_t valid_addr
 		mapped_addr, valid_addr = self.mapper.cpu_map_read(addr)
 		if valid_addr:
 			return self._v_prog_memory[mapped_addr], True

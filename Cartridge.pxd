@@ -17,3 +17,4 @@ cdef class Cartridge:
 	cdef uint8_t ppu_write(self, uint16_t addr, uint8_t data)
 	cpdef uint8_t cpu_write(self, uint16_t addr, uint8_t data)
 	cdef uint8_t ppu_read(self, uint16_t addr, uint8_t* data)
+	cpdef (uint8_t, uint8_t) cpu_read(self, uint16_t addr)

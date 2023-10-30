@@ -32,7 +32,7 @@ cdef class CPU6502:
 		self._addr_abs = 0x0000	# Stores absolute address
 		self._addr_rel = 0x0000	# Stores relative address from jump location
 		self._opcode = 0x00		# Stores instruction opcode
-		self._cycles = 0 		# Stores number of remaining instruction cycles
+		self.cycles = 0 		# Stores number of remaining instruction cycles
 
 		self.lookup = np.full(16**2, Instruction('???', opcode=self.XXX, addr_mode=self.IMP, cycles=2), dtype=Instruction)
 
@@ -203,21 +203,6 @@ cdef class CPU6502:
 		self.V = (1 << 6)	# Overflow
 		self.N = (1 << 7)	# Negative
 
-	@property
-	def cycles(self):
-		return self._cycles
-
-	@cycles.setter
-	def cycles(self, v):
-		self._cycles = v
-
-	@property
-	def opcode(self):
-		return self._opcode
-
-	@opcode.setter
-	def opcode(self, v):
-		self._opcode = v
 
 	def connect_bus(self, bus: Bus):
 		self.bus = bus
@@ -259,7 +244,7 @@ cdef class CPU6502:
 		self.pc = (hi<<8) | lo
 
 		self.instruction = None
-		self._cycles = 8
+		self.cycles = 8
 
 	# Servicing maskable interrupts
 	def irq(self):
@@ -285,7 +270,7 @@ cdef class CPU6502:
 			hi = self.read(self._addr_abs + 1)
 			self.pc = (hi<<8) | lo
 
-			self._cycles = 7
+			self.cycles = 7
 
 	# Servicing non-maskable interrupts
 	def nmi(self):
@@ -310,12 +295,12 @@ cdef class CPU6502:
 		hi = self.read(self._addr_abs + 1)
 		self.pc = (hi<<8) | lo
 
-		self._cycles = 8
+		self.cycles = 8
 
 	# Triggers clock cycle
 	cpdef void clock(self):
 		cdef uint8_t additional_clock_cycle_1, additional_clock_cycle_2
-		if self._cycles == 0: 	# Next instruction ready
+		if self.cycles == 0: 	# Next instruction ready
 			# Service interrupts first
 			if self._nm_interrupt:
 				self.nmi()
@@ -340,14 +325,14 @@ cdef class CPU6502:
 			additional_clock_cycle_2 = (self.instruction.opcode)()
 
 			# Store number of required clock cycles
-			self._cycles = self.instruction.cycles
-			self._cycles += (additional_clock_cycle_1 & additional_clock_cycle_2)
+			self.cycles = self.instruction.cycles
+			self.cycles += (additional_clock_cycle_1 & additional_clock_cycle_2)
 
 			# Always set unused flag
 			self.set_flag(self.U, 1)
 
 		# else:
-		self._cycles-=1
+		self.cycles-=1
 
 	# Print CPU internal state
 	def __str__(self):
@@ -576,11 +561,11 @@ cdef class CPU6502:
 	"""
 	cdef uint8_t BCC(self):
 		if self.get_flag(self.C) == 0:
-			self._cycles+=1
+			self.cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
 
 			if (self._addr_abs&0xFF00) != (self.pc&0xFF00):	# If page boundary crossed
-				self._cycles+=1
+				self.cycles+=1
 
 			self.pc = self._addr_abs
 
@@ -595,11 +580,11 @@ cdef class CPU6502:
 	"""
 	cdef uint8_t BCS(self):
 		if self.get_flag(self.C):
-			self._cycles+=1
+			self.cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
 
 			if (self._addr_abs&0xFF00) != (self.pc&0xFF00):	# If page boundary crossed
-				self._cycles+=1
+				self.cycles+=1
 
 			self.pc = self._addr_abs
 
@@ -615,11 +600,11 @@ cdef class CPU6502:
 	"""
 	cdef uint8_t BEQ(self):
 		if self.get_flag(self.Z):
-			self._cycles+=1
+			self.cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
 
 			if (self._addr_abs&0xFF00) != (self.pc&0xFF00):	# If page boundary crossed
-				self._cycles+=1
+				self.cycles+=1
 
 			self.pc = self._addr_abs
 
@@ -646,11 +631,11 @@ cdef class CPU6502:
 	"""
 	cdef uint8_t BMI(self):
 		if self.get_flag(self.N):
-			self._cycles+=1
+			self.cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
 
 			if (self._addr_abs&0xFF00) != (self.pc&0xFF00):	# If page boundary crossed
-				self._cycles+=1
+				self.cycles+=1
 
 			self.pc = self._addr_abs
 
@@ -662,11 +647,11 @@ cdef class CPU6502:
 	"""
 	cdef uint8_t BNE(self):
 		if self.get_flag(self.Z) == 0:
-			self._cycles+=1
+			self.cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
 
 			if (self._addr_abs&0xFF00) != (self.pc&0xFF00):	# If page boundary crossed
-				self._cycles+=1
+				self.cycles+=1
 
 			self.pc = self._addr_abs
 
@@ -678,11 +663,11 @@ cdef class CPU6502:
 	"""
 	cdef uint8_t BPL(self):
 		if self.get_flag(self.N) == 0:
-			self._cycles+=1
+			self.cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
 
 			if (self._addr_abs&0xFF00) != (self.pc&0xFF00):	# If page boundary crossed
-				self._cycles+=1
+				self.cycles+=1
 
 			self.pc = self._addr_abs
 
@@ -721,11 +706,11 @@ cdef class CPU6502:
 	"""
 	cdef uint8_t BVC(self):
 		if self.get_flag(self.V) == 0:
-			self._cycles+=1
+			self.cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
 
 			if (self._addr_abs&0xFF00) != (self.pc&0xFF00):	# If page boundary crossed
-				self._cycles+=1
+				self.cycles+=1
 
 			self.pc = self._addr_abs
 
@@ -737,11 +722,11 @@ cdef class CPU6502:
 	"""
 	cdef uint8_t BVS(self):
 		if self.get_flag(self.V):
-			self._cycles+=1
+			self.cycles+=1
 			self._addr_abs = self.pc + self._addr_rel
 
 			if (self._addr_abs&0xFF00) != (self.pc&0xFF00):	# If page boundary crossed
-				self._cycles+=1
+				self.cycles+=1
 
 			self.pc = self._addr_abs
 

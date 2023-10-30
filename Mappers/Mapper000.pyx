@@ -1,7 +1,5 @@
 # cython: cflags=-O3, boundscheck=False, wraparound=False, cdivision=True, nonecheck=False, initializedcheck=False, overflowcheck=False
 
-
-
 from .Mapper cimport Mapper
 
 cdef extern from "stdint.h":
@@ -18,16 +16,16 @@ cdef class Mapper000(Mapper):
 
 		return (0x00, False)
 
-	cpdef tuple ppu_map_read(self, uint16_t addr):
+	cpdef (uint16_t, uint8_t) ppu_map_read(self, uint16_t addr):
 		cdef uint16_t mapped_addr
 		if addr >= 0x0000 and addr <= 0x1FFF:
 			mapped_addr = addr
 			return (mapped_addr, True)
 
-		return (0x00, False)
+		return (0x0000, False)
 
 	# CPU to mapper communication 
-	cpdef tuple cpu_map_write(self, uint16_t addr, uint8_t data):
+	cpdef (uint16_t, uint8_t) cpu_map_write(self, uint16_t addr):
 		cdef uint16_t mapped_addr
 		if addr >= 0x8000 and addr <= 0xFFFF:		# Cartridge
 			"""
@@ -39,10 +37,10 @@ cdef class Mapper000(Mapper):
 			mapped_addr = addr & (0x7FFF if self.prog_banks > 1 else 0x3FFF)
 			return (mapped_addr, True)
 
-		return (0x00, False)
+		return (0x0000, False)
 
 
-	cpdef tuple cpu_map_read(self, uint16_t addr):
+	cpdef (uint16_t, uint8_t) cpu_map_read(self, uint16_t addr):
 		cdef uint16_t mapped_addr
 		if addr >= 0x8000 and addr <= 0xFFFF:
 			mapped_addr = addr & (0x7FFF if self.prog_banks > 1 else 0x3FFF)

@@ -28,7 +28,7 @@ cdef class CPU6502:
 	cdef uint16_t _addr_abs
 	cdef uint16_t _addr_rel
 	cdef uint8_t _opcode
-	cdef uint8_t _cycles
+	cdef public uint8_t cycles
 	cdef object lookup
 	cdef object instruction
 

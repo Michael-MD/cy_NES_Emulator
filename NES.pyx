@@ -126,12 +126,16 @@ cdef class NES:
 		self._clock = pygame.time.Clock()
 		image_surface = pygame.Surface((256, 240))
 
+		i = 0
+		a = np.zeros((256, 240, 3), dtype=np.uint8)
+
 		while True:
 			self.clock_system(100_000)
 
 			# if self.ppu.end_of_frame:
-			# self.ppu.end_of_frame = False
-			pygame.surfarray.blit_array(image_surface, self.ppu.screen)  # Update the Surface
+			# 	self.ppu.end_of_frame = False
+			a[:] = self.ppu.screen[:]
+			pygame.surfarray.blit_array(image_surface, a)  # Update the Surface
 			self.screen.blit(image_surface, (0, 0))
 			pygame.display.update()
 
@@ -160,4 +164,8 @@ cdef class NES:
 					pygame.quit()
 					exit()
 
-			# self._clock.tick(60)				
+			self._clock.tick(60)
+
+			i+= 1
+			if i %20:
+				print(self._clock.get_fps())				
