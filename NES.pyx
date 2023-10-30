@@ -129,10 +129,8 @@ cdef class NES:
 		a = np.zeros((256, 240, 3), dtype=np.uint8)
 
 		while True:
-			self.clock_system(100_000)
+			self.clock_system(82_190)
 
-			# if self.ppu.end_of_frame:
-			# 	self.ppu.end_of_frame = False
 			a[:] = self.ppu.screen[:]
 			pygame.surfarray.blit_array(image_surface, a)  # Update the Surface
 			self.screen.blit(image_surface, (0, 0))
@@ -164,3 +162,5 @@ cdef class NES:
 					exit()
 
 			self._clock.tick(60)
+
+			
