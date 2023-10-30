@@ -31,6 +31,15 @@ cdef class NES:
 	cdef object screen
 	cdef object _clock
 
+	cdef int width
+	cdef int height
+
+	cdef int screen_width
+	cdef int screen_height
+
+	cdef int padding_left
+	cdef int pading_top
+
 	def __cinit__(self, rom_directory):
 		self.rom_name, self.file_ext = os.path.splitext(rom_directory)
 		
@@ -118,22 +127,44 @@ cdef class NES:
 
 	cdef void clock_system(self, N=3):
 		self.bus.clock(N)
-			
+	
+	def init_dimensions(self, screen_width, screen_height):
+		scale_factor = min(screen_width / self.width, screen_height / self.height)
+
+		# Calculate the scaled dimensions
+		self.width = int(self.width * scale_factor)
+		self.height = int(self.height * scale_factor)
+
+		self.screen_width = screen_width
+		self.screen_height = screen_height
+
+		self.padding_left = self.screen_width//2 - self.width//2
+		self.pading_top = self.screen_height//2 - self.height//2
+
 	cpdef void run(self):
 		pygame.init()
 		self.screen = pygame.display.set_mode((255, 239), pygame.RESIZABLE)
 		self.screen.fill((0,0,0))
 		self._clock = pygame.time.Clock()
-		image_surface = pygame.Surface((256, 240))
+		self.width = 256
+		self.height = 240
+
+		self.screen_width = 256
+		self.screen_height = 240
+
+		self.padding_left = 0
+		self.pading_top = 0
 
 		a = np.zeros((256, 240, 3), dtype=np.uint8)
+		image_surface = pygame.surfarray.make_surface(a)
 
 		while True:
 			self.clock_system(82_190)
 
 			a[:] = self.ppu.screen[:]
+
 			pygame.surfarray.blit_array(image_surface, a)  # Update the Surface
-			self.screen.blit(image_surface, (0, 0))
+			self.screen.blit(pygame.transform.scale(image_surface, (self.width, self.height)), (self.padding_left, self.pading_top))
 			pygame.display.update()
 
 			self.bus.controller = 0
@@ -160,6 +191,8 @@ cdef class NES:
 				if event.type == pygame.QUIT:
 					pygame.quit()
 					exit()
+				elif event.type == pygame.VIDEORESIZE:
+					self.init_dimensions(*event.size)
 
 			self._clock.tick(60)
 
