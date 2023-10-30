@@ -158,6 +158,17 @@ cdef class NES:
 		a = np.zeros((256, 240, 3), dtype=np.uint8)
 		image_surface = pygame.surfarray.make_surface(a)
 
+		using_joystick = False
+		# Joystick buttons, nesdev: https://www.nesdev.org/wiki/Standard_controller#Output_($4016/$4017_read)
+		A = 0b1<<7
+		B = 0b1<<6
+		SELECT = 0b1<<5
+		START = 0b1<<4
+		UP = 0b1<<3
+		DOWN = 0b1<<2
+		LEFT = 0b1<<1
+		RIGHT = 0b1<<0
+
 		while True:
 			self.clock_system(82_190)
 
@@ -169,23 +180,66 @@ cdef class NES:
 
 			self.bus.controller = 0
 			
-			keys = pygame.key.get_pressed()
-			if keys[pygame.K_UP]:
-				self.bus.controller |= 0x08
-			if keys[pygame.K_LEFT]:
-				self.bus.controller |= 0x02
-			if keys[pygame.K_DOWN]:
-				self.bus.controller |= 0x04
-			if keys[pygame.K_RIGHT]:
-				self.bus.controller |= 0x01
-			if keys[pygame.K_s]:
-				self.bus.controller |= 0x10
-			if keys[pygame.K_a]:
-				self.bus.controller |= 0x20
-			if keys[pygame.K_z]:
-				self.bus.controller |= 0x40
-			if keys[pygame.K_x]:
-				self.bus.controller |= 0x80
+			if not using_joystick:
+				keys = pygame.key.get_pressed()
+				if keys[pygame.K_UP]:
+					self.bus.controller |= UP
+				if keys[pygame.K_LEFT]:
+					self.bus.controller |= LEFT
+				if keys[pygame.K_DOWN]:
+					self.bus.controller |= DOWN
+				if keys[pygame.K_RIGHT]:
+					self.bus.controller |= RIGHT
+				if keys[pygame.K_s]:
+					self.bus.controller |= START
+				if keys[pygame.K_a]:
+					self.bus.controller |= SELECT
+				if keys[pygame.K_z]:
+					self.bus.controller |= B
+				if keys[pygame.K_x]:
+					self.bus.controller |= A
+
+			if using_joystick:
+				"""
+                Joystick mapping:
+                      ======_                               _=====_
+                     / _____ \                             / _____ \
+                   +.-'_____'-.---------------------------.-'_____'-.+
+                  /   |     |  '.                       .'  |  _  |   \
+                 / ___| /|\ |___ \                     / ___| /3\ |___ \
+                / |     11      | ;  __           _   ; | _         _ | ;
+                | | <-13   14-> | | |_6|         |7:> | ||2|       (1)| |
+                | |___  12   ___| ;SELECT       START ; |___       ___| ;
+                |\    | \|/ |    /  _     ___      _   \    | (0) |    /|
+                | \   |_____|  .','" "', |___|  ,'" "', '.  |_____|  .' |
+                |  '-.______.-' /       \ANALOG/       \  '-._____.-'   |
+                |               |       |------|       |                |
+                |              /\       /      \       /\               |
+                |             /  '.___.'        '.___.'  \              |
+                |            /                            \             |
+                 \          /                              \           /
+                  \________/                                \_________/
+                ASCII art source: https://www.asciiart.eu/computers/game-consoles
+				"""
+
+				if joystick.get_button(0):
+					self.bus.controller |= A
+				if joystick.get_button(1):
+					self.bus.controller |= B
+				if joystick.get_button(6):
+					self.bus.controller |= SELECT
+				if joystick.get_button(7):
+					self.bus.controller |= START
+
+				hat = joystick.get_hat(0)
+				if hat[1] == 1:
+					self.bus.controller |= UP
+				if hat[1] == -1:
+					self.bus.controller |= DOWN
+				if hat[0] == -1:
+					self.bus.controller |= LEFT
+				if hat[0] == 1:
+					self.bus.controller |= RIGHT
 
 			for event in pygame.event.get():
 				if event.type == pygame.QUIT:
@@ -193,6 +247,13 @@ cdef class NES:
 					exit()
 				elif event.type == pygame.VIDEORESIZE:
 					self.init_dimensions(*event.size)
+				elif event.type == pygame.JOYDEVICEADDED:
+					pygame.joystick.init()
+					joystick = pygame.joystick.Joystick(event.device_index)
+					using_joystick = True
+				elif event.type == pygame.JOYDEVICEADDED:
+					joystick.quit()
+					using_joystick = False
 
 			self._clock.tick(60)
 

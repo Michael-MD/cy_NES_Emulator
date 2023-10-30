@@ -1,5 +1,5 @@
 # cy_NES_Emulator
-This is an emulator I wrote for emulating the nes system using cython. 
+Nes system in cython with joystick support. 
 This project was heavily inspired from javidx9 (https://www.youtube.com/@javidx9) so thanks to him.
 
 <img src="smb.gif" width="400"/>
