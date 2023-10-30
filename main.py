@@ -1,8 +1,12 @@
+# example: python cy_NES_Emulator/main.py -run "Super Mario Bros (E).nes"
+
 import argparse
 import sys
 import os
 import tkinter
 from tkinter import filedialog
+import pkg_resources
+from pkg_resources import DistributionNotFound, VersionConflict
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.dirname(SCRIPT_DIR))
@@ -16,6 +20,11 @@ ftypes = [
 def search_for_file_path ():
     currdir = os.getcwd()
     return filedialog.askopenfilename(parent=root, initialdir=currdir, title='Select ROM', filetypes=ftypes)
+
+with open(f"{SCRIPT_DIR}/requirements.txt", "r") as f:
+    dependencies = f.read().split('\n')
+
+pkg_resources.require(dependencies)
 
 if __name__ == "__main__":
 
