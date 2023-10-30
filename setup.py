@@ -1,9 +1,18 @@
 from setuptools import setup, Extension
 from Cython.Build import cythonize
 import numpy
+import os
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+with open(f"{SCRIPT_DIR}/requirements.txt", "r") as f:
+    dependencies = f.read().split('\n')
 
 setup(
 	name='NES Emulator',
+	version="1.0",
+	author="Michael Deimetry",
+	author_email="mdeimetry@gmail.com",
+    description="NES Emulator written in Cython.",
 	package_dir={'cy_NES_Emulator': ''},
 	include_dirs=[numpy.get_include()],
     ext_modules=cythonize([
@@ -17,7 +26,8 @@ setup(
     	'Mappers/Mapper000.pyx',
     	# 'EmulationDebugger.pyx',
     	# 'available_colours.pyx',
-    ])
+    ]),
+    install_requires=dependencies,
 )
 
 
