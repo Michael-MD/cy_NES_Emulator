@@ -46,7 +46,7 @@ You may also specity a patd directly using
 pytdon cy_NES_Emulator -run "Super Mario Bros (E).nes"
 ```
 
-### Witdin Pytdon file
+### Within Python file
 Simply import as follows
 ```
 from cy_NES_Emulator import NES
