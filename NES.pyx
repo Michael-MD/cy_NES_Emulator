@@ -251,7 +251,7 @@ cdef class NES:
 					pygame.joystick.init()
 					joystick = pygame.joystick.Joystick(event.device_index)
 					using_joystick = True
-				elif event.type == pygame.JOYDEVICEADDED:
+				elif event.type == pygame.JOYDEVICEREMOVED:
 					joystick.quit()
 					using_joystick = False
 
