@@ -55,6 +55,10 @@ cdef class NES:
 			n_prog_chunks = rom[4]	# specified in 16kB chunks
 			n_char_chunks = rom[5]	# specified in 8kB chunks
 
+			using_char_RAM = False
+			if n_char_chunks == 0:
+				using_char_RAM = True
+
 			flag_6 = rom[6]
 			mirroring = flag_6 & (1<<0) 	# 0: horizontal, 1: vertical
 			persistent_memory = flag_6 & (1<<1)
@@ -68,7 +72,16 @@ cdef class NES:
 			nes_2_format = flag_7 & (1<<2)
 			n_mapper_ID_hi = flag_7 >> 4
 
-			self.n_mapper_ID = n_mapper_ID_hi | n_mapper_ID_lo
+			if nes_2_format:
+				raise Exception('NES 2.0 format not supported.')
+
+			self.n_mapper_ID = (n_mapper_ID_hi<<4) | n_mapper_ID_lo
+
+			if (n_mapper_ID_hi & 0x0C) == 0x08:
+				file_type = 2
+				raise Exception('File Type 2 not supported.')
+			else:
+				file_type = 1
 
 			prog_ram_size = flag_8 = rom[8]
 
@@ -76,7 +89,7 @@ cdef class NES:
 			tv_system = flag_9 & 1	# (0: NTSC; 1: PAL)
 
 		# Instantiate cartridge class and load with program and palette data
-		self.cart = Cartridge(n_prog_chunks, n_char_chunks)
+		self.cart = Cartridge(n_prog_chunks, 1 if using_char_RAM else n_char_chunks)
 
 		self.cart.connect_mapper(self.n_mapper_ID, n_prog_chunks, n_char_chunks)
 
@@ -89,7 +102,9 @@ cdef class NES:
 		v_char_memory_start = v_prog_memory_end
 		v_char_memory_end = v_char_memory_start + (n_char_chunks*8*1024)
 		self.cart.v_prog_memory[:] = rom[v_prog_memory_start:v_prog_memory_end]
-		self.cart.v_char_memory[:] = rom[v_char_memory_start:v_char_memory_end]
+		if not using_char_RAM:
+			self.cart.v_char_memory[:] = rom[v_char_memory_start:v_char_memory_end]
+
 		# Set up NES system components
 		self.bus = Bus()
 		self.cpu = CPU6502()
