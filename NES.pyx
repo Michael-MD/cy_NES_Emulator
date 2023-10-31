@@ -160,7 +160,7 @@ cdef class NES:
 		DOWN = 0b1<<2
 		LEFT = 0b1<<1
 		RIGHT = 0b1<<0
-		i = 0
+
 		while True:
 			self.clock_system(82_190)
 
@@ -248,9 +248,5 @@ cdef class NES:
 					using_joystick = False
 
 			self._clock.tick(60)
-
-			i += 1
-			if i%100:
-				print(self._clock.get_fps())
 
 			
