@@ -16,7 +16,7 @@ public:
 	virtual uint8_t ppu_map_write(uint16_t addr, uint16_t *mapped_addr) = 0;
 
 	virtual uint8_t cpu_map_read(uint16_t addr, uint16_t *mapped_addr) = 0;
-	virtual uint8_t cpu_map_write(uint16_t addr, uint16_t *mapped_addr) = 0;
+	virtual uint8_t cpu_map_write(uint16_t addr, uint16_t *mapped_addr, uint8_t data) = 0;
 
 };
 

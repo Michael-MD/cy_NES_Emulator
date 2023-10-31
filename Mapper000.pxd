@@ -8,4 +8,4 @@ cdef extern from "Mapper000.hpp":
         unsigned char ppu_map_write(unsigned short addr, unsigned short *mapped_addr)
 
         unsigned char cpu_map_read(unsigned short addr, unsigned short *mapped_addr)
-        unsigned char cpu_map_write(unsigned short addr, unsigned short *mapped_addr)
+        unsigned char cpu_map_write(unsigned short addr, unsigned short *mapped_addr, unsigned char data)

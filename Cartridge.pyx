@@ -1,5 +1,5 @@
 # distutils: language = c++
-# distutils: sources = [Mapper000.cpp, Mapper.cpp]
+# distutils: sources = [Mapper.cpp, Mapper000.cpp, Mapper002.cpp]
 
 import numpy as np
 from .Bus import Bus
@@ -37,6 +37,9 @@ cdef class Cartridge:
 		if n_mapper_ID == 0:
 			self.mapper000 = new Mapper000(n_prog_chunks, n_char_chunks)
 			self.mapper = <Mapper*>self.mapper000
+		elif n_mapper_ID == 2:
+			self.mapper002 = new Mapper002(n_prog_chunks, n_char_chunks)
+			self.mapper = <Mapper*>self.mapper002
 		else:
 			raise Exception('Unsupported mapper.')
 
@@ -65,7 +68,7 @@ cdef class Cartridge:
 	cpdef uint8_t cpu_write(self, uint16_t addr, uint8_t data):
 		cdef uint16_t mapped_addr 
 		cdef uint8_t valid_addr
-		valid_addr = self.mapper.cpu_map_write(addr, &mapped_addr)
+		valid_addr = self.mapper.cpu_map_write(addr, &mapped_addr, data)
 		if valid_addr:
 			self._v_prog_memory[mapped_addr] = data
 			return True

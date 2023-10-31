@@ -34,7 +34,7 @@ uint8_t Mapper000::cpu_map_read(uint16_t addr, uint16_t *mapped_addr)
 	return false;
 }
 
-uint8_t Mapper000::cpu_map_write(uint16_t addr, uint16_t *mapped_addr)
+uint8_t Mapper000::cpu_map_write(uint16_t addr, uint16_t *mapped_addr, uint8_t data)
 {
 	if (addr >= 0x8000 && addr <= 0xFFFF)
 	{

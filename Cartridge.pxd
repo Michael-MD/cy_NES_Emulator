@@ -3,6 +3,7 @@
 
 from Mapper cimport Mapper
 from Mapper000 cimport Mapper000
+from Mapper002 cimport Mapper002
 
 cdef extern from "stdint.h":
 	ctypedef unsigned char uint8_t
@@ -15,6 +16,7 @@ cdef class Cartridge:
 	"""
 	cdef Mapper* mapper
 	cdef Mapper000* mapper000
+	cdef Mapper002* mapper002
 
 	cdef uint8_t n_prog_chunks
 	cdef uint8_t n_char_chunks
