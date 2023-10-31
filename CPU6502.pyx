@@ -213,7 +213,7 @@ cdef class CPU6502:
 	cdef uint8_t read(self, uint16_t addr):
 		return self.bus.read(addr)
 
-	def get_flag(self, f):
+	cdef uint8_t get_flag(self, uint8_t f):
 		return self.status & f
 
 	cdef void set_flag(self, uint16_t f, uint16_t v):

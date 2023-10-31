@@ -46,6 +46,7 @@ cdef class CPU6502:
 	
 	cdef void write(self, uint16_t addr, uint8_t data)
 	cdef uint8_t read(self, uint16_t addr)
+	cdef uint8_t get_flag(self, uint8_t f)
 	cdef void set_flag(self, uint16_t f, uint16_t v)
 	cpdef void clock(self)
 
