@@ -7,3 +7,8 @@ test*
 *.lib
 *.obj
 *.html
+Bus.cpp
+CPU6502.cpp
+NES.cpp
+PPU.cpp
+Cartridge.cpp
