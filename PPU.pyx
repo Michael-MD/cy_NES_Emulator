@@ -1,5 +1,4 @@
-# cython: cflags=-O3, boundscheck=False, wraparound=False, cdivision=True, nonecheck=False, initializedcheck=False, overflowcheck=False
-
+# cython: profile=False
 
 import numpy as np
 import ctypes
@@ -247,19 +246,6 @@ cdef class PPU:
 	@v_mirroring.setter
 	def v_mirroring(self, v):
 		self._v_mirroring = v
-
-		# Once the mirroring mode has been set we set up the nametable to match
-		if self.v_mirroring:
-			self.nametable = [
-								[self.nametable_a, self.nametable_b],
-								[self.nametable_a, self.nametable_b]
-							]
-		else:
-			self.nametable = [
-								[self.nametable_a, self.nametable_a],
-								[self.nametable_b, self.nametable_b]
-							]
-
 
 	cdef void _load_bg_shifters(self):
 		# Place tile data into shift registers for rendering onto screen
@@ -684,7 +670,17 @@ cdef class PPU:
 			NT_x = (addr >> 10) & 0xb1
 			coarse_y = (addr >> 5) & 0x1F
 			coarse_x = (addr >> 0) & 0x1F
-			self.nametable[NT_y][NT_x][coarse_y, coarse_x] = data
+
+			if self._v_mirroring:
+				if NT_x == 0:
+					self.nametable_a[coarse_y, coarse_x] = data
+				else:
+					self.nametable_b[coarse_y, coarse_x] = data
+			else:
+				if NT_y == 0:
+					self.nametable_a[coarse_y, coarse_x] = data
+				else:
+					self.nametable_b[coarse_y, coarse_x] = data
 
 		elif (addr >= 0x3F00) and (addr <= 0x3FFF):		# Palette memory
 			addr &= 0x1F	# address mod 32bytes
@@ -714,7 +710,17 @@ cdef class PPU:
 			NT_x = (addr >> 10) & 0xb1
 			coarse_y = (addr >> 5) & 0x1F
 			coarse_x = (addr >> 0) & 0x1F
-			data = self.nametable[NT_y][NT_x][coarse_y, coarse_x]
+
+			if self._v_mirroring:
+				if NT_x == 0:
+					data = self.nametable_a[coarse_y, coarse_x]
+				else:
+					data = self.nametable_b[coarse_y, coarse_x]
+			else:
+				if NT_y == 0:
+					data = self.nametable_a[coarse_y, coarse_x]
+				else:
+					data = self.nametable_b[coarse_y, coarse_x]
 
 		elif (addr >= 0x3F00) and (addr <= 0x3FFF):		# Palette memory
 			addr &= 0x1F	# address mod 32bytes
