@@ -1,3 +1,4 @@
+# distutils: language = c++
 # cython: profile=False
 
 import numpy as np

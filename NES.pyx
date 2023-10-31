@@ -1,3 +1,4 @@
+# distutils: language = c++
 # cython: cflags=-O3, boundscheck=False, wraparound=False, cdivision=True, nonecheck=False, initializedcheck=False, overflowcheck=False
 
 import os
@@ -8,7 +9,6 @@ from .CPU6502 cimport CPU6502
 from .Cartridge cimport Cartridge
 from .Bus cimport Bus
 from .PPU cimport PPU
-from .Mappers import Mapper000
 
 cdef extern from "stdint.h":
 	ctypedef unsigned char uint8_t
@@ -78,14 +78,7 @@ cdef class NES:
 		# Instantiate cartridge class and load with program and palette data
 		self.cart = Cartridge(n_prog_chunks, n_char_chunks)
 
-		if self.n_mapper_ID == 0:
-			mapper = Mapper000
-		else:
-			raise Exception('Unsupported mapper.')
-		
-		self.cart.connect_mapper(
-			mapper(n_prog_chunks, n_char_chunks)
-		)
+		self.cart.connect_mapper(self.n_mapper_ID, n_prog_chunks, n_char_chunks)
 
 		offset = 0
 		if byte_trainer:
@@ -97,7 +90,6 @@ cdef class NES:
 		v_char_memory_end = v_char_memory_start + (n_char_chunks*8*1024)
 		self.cart.v_prog_memory[:] = rom[v_prog_memory_start:v_prog_memory_end]
 		self.cart.v_char_memory[:] = rom[v_char_memory_start:v_char_memory_end]
-
 		# Set up NES system components
 		self.bus = Bus()
 		self.cpu = CPU6502()
@@ -168,7 +160,7 @@ cdef class NES:
 		DOWN = 0b1<<2
 		LEFT = 0b1<<1
 		RIGHT = 0b1<<0
-
+		i = 0
 		while True:
 			self.clock_system(82_190)
 
@@ -256,5 +248,9 @@ cdef class NES:
 					using_joystick = False
 
 			self._clock.tick(60)
+
+			i += 1
+			if i%100:
+				print(self._clock.get_fps())
 
 			

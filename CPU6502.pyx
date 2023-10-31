@@ -1,3 +1,4 @@
+# distutils: language = c++
 # cython: cflags=-O3, boundscheck=False, wraparound=False, cdivision=True, nonecheck=False, initializedcheck=False, overflowcheck=False
 
 
@@ -240,7 +241,6 @@ cdef class CPU6502:
 		self._addr_abs = 0xFFFC
 		lo = self.read(self._addr_abs)
 		hi = self.read(self._addr_abs+1)
-
 		self.pc = (hi<<8) | lo
 
 		self.instruction = None

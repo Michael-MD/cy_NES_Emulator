@@ -1,11 +1,12 @@
-# cython: cflags=-O3, boundscheck=False, wraparound=False, cdivision=True, nonecheck=False, initializedcheck=False, overflowcheck=False
+# distutils: language = c++
+# distutils: sources = [Mapper000.cpp, Mapper.cpp]
 
 import numpy as np
 from .Bus import Bus
 
 cdef class Cartridge:
 	def __cinit__(self, uint8_t n_prog_chunks, uint8_t n_char_chunks):
-		self.mapper = None
+		# self.mapper = None
 
 		self.n_prog_chunks = n_prog_chunks
 		self.n_char_chunks = n_char_chunks
@@ -32,14 +33,18 @@ cdef class Cartridge:
 		return self._v_char_memory
 
 	# Connect Components
-	def connect_mapper(self, mapper):
-		self.mapper = mapper
+	def connect_mapper(self, n_mapper_ID, n_prog_chunks, n_char_chunks):
+		if n_mapper_ID == 0:
+			self.mapper000 = new Mapper000(n_prog_chunks, n_char_chunks)
+			self.mapper = <Mapper*>self.mapper000
+		else:
+			raise Exception('Unsupported mapper.')
 
 	# PPU with internal bus communication
 	cdef uint8_t ppu_write(self, uint16_t addr, uint8_t data):
 		cdef uint16_t mapped_addr 
 		cdef uint8_t valid_addr
-		mapped_addr, valid_addr = self.mapper.ppu_map_write(addr, data)
+		valid_addr = self.mapper.ppu_map_write(addr, &mapped_addr)
 		if valid_addr:	
 			self._v_char_memory[mapped_addr] = data
 			return True
@@ -48,7 +53,7 @@ cdef class Cartridge:
 	cdef uint8_t ppu_read(self, uint16_t addr, uint8_t* data):
 		cdef uint16_t mapped_addr 
 		cdef uint8_t valid_addr
-		mapped_addr, valid_addr = self.mapper.ppu_map_read(addr)
+		valid_addr = self.mapper.ppu_map_read(addr, &mapped_addr)
 		if valid_addr:
 			data[0] = self._v_char_memory[mapped_addr]	
 			return True
@@ -60,7 +65,7 @@ cdef class Cartridge:
 	cpdef uint8_t cpu_write(self, uint16_t addr, uint8_t data):
 		cdef uint16_t mapped_addr 
 		cdef uint8_t valid_addr
-		mapped_addr, valid_addr = self.mapper.cpu_map_write(addr)
+		valid_addr = self.mapper.cpu_map_write(addr, &mapped_addr)
 		if valid_addr:
 			self._v_prog_memory[mapped_addr] = data
 			return True
@@ -69,7 +74,7 @@ cdef class Cartridge:
 	cpdef (uint8_t, uint8_t) cpu_read(self, uint16_t addr):
 		cdef uint16_t mapped_addr 
 		cdef uint8_t valid_addr
-		mapped_addr, valid_addr = self.mapper.cpu_map_read(addr)
+		valid_addr = self.mapper.cpu_map_read(addr, &mapped_addr)
 		if valid_addr:
 			return self._v_prog_memory[mapped_addr], True
 		return 0x00, False

@@ -1,3 +1,9 @@
+# distutils: language = c++
+# distutils: sources = [Mapper000.cpp, Mapper.cpp]
+
+from Mapper cimport Mapper
+from Mapper000 cimport Mapper000
+
 cdef extern from "stdint.h":
 	ctypedef unsigned char uint8_t
 	ctypedef unsigned short uint16_t
@@ -7,7 +13,8 @@ cdef class Cartridge:
 	Pattern (char) memory which contains sprite informations is located 
 	at address range 0x0000 to 0x1FFF.
 	"""
-	cdef object mapper
+	cdef Mapper* mapper
+	cdef Mapper000* mapper000
 
 	cdef uint8_t n_prog_chunks
 	cdef uint8_t n_char_chunks

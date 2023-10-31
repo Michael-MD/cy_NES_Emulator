@@ -1,3 +1,4 @@
+# distutils: language = c++
 # cython: cflags=-O3, boundscheck=False, wraparound=False, cdivision=True, nonecheck=False, initializedcheck=False, overflowcheck=False
 
 cdef extern from "stdint.h":
