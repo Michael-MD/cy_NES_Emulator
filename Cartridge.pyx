@@ -11,7 +11,11 @@ cdef class Cartridge:
 		self.n_prog_chunks = n_prog_chunks
 		self.n_char_chunks = n_char_chunks
 		self._v_prog_memory = np.zeros(n_prog_chunks * 16 * 1024, dtype=np.uint8)	# Single chunk 16kB
-		self._v_char_memory = np.zeros(n_char_chunks * 8 * 1024, dtype=np.uint8)		# Single chunk 8kB
+
+		if n_char_chunks == 0:
+			self._v_char_memory = np.zeros(8 * 1024, dtype=np.uint8)
+		else:
+			self._v_char_memory = np.zeros(n_char_chunks * 8 * 1024, dtype=np.uint8)
 
 		"""
 		Restructures 1D array to ndarray with the following inputs
@@ -45,7 +49,7 @@ cdef class Cartridge:
 
 	# PPU with internal bus communication
 	cdef uint8_t ppu_write(self, uint16_t addr, uint8_t data):
-		cdef uint16_t mapped_addr 
+		cdef uint32_t mapped_addr
 		cdef uint8_t valid_addr
 		valid_addr = self.mapper.ppu_map_write(addr, &mapped_addr)
 		if valid_addr:	
@@ -54,7 +58,7 @@ cdef class Cartridge:
 		return False
 		
 	cdef uint8_t ppu_read(self, uint16_t addr, uint8_t* data):
-		cdef uint16_t mapped_addr 
+		cdef uint32_t mapped_addr
 		cdef uint8_t valid_addr
 		valid_addr = self.mapper.ppu_map_read(addr, &mapped_addr)
 		if valid_addr:
@@ -66,18 +70,21 @@ cdef class Cartridge:
 
 	# CPU-Cart registers communication
 	cpdef uint8_t cpu_write(self, uint16_t addr, uint8_t data):
-		cdef uint16_t mapped_addr 
+		cdef uint32_t mapped_addr
 		cdef uint8_t valid_addr
 		valid_addr = self.mapper.cpu_map_write(addr, &mapped_addr, data)
 		if valid_addr:
-			self._v_prog_memory[mapped_addr] = data
+			if mapped_addr != 0xFFFFFFFF:
+				self._v_prog_memory[mapped_addr] = data
 			return True
 		return False
 		
 	cpdef (uint8_t, uint8_t) cpu_read(self, uint16_t addr):
-		cdef uint16_t mapped_addr 
+		cdef uint32_t mapped_addr
 		cdef uint8_t valid_addr
 		valid_addr = self.mapper.cpu_map_read(addr, &mapped_addr)
 		if valid_addr:
-			return self._v_prog_memory[mapped_addr], True
+			if mapped_addr != 0xFFFFFFFF:
+				return self._v_prog_memory[mapped_addr], True
+			return 0x00, True
 		return 0x00, False

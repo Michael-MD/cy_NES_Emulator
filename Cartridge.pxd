@@ -8,6 +8,7 @@ from Mapper002 cimport Mapper002
 cdef extern from "stdint.h":
 	ctypedef unsigned char uint8_t
 	ctypedef unsigned short uint16_t
+	ctypedef unsigned int uint32_t
 
 cdef class Cartridge:
 	"""

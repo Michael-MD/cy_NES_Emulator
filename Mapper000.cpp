@@ -1,7 +1,7 @@
 #include "Mapper000.hpp"
 #include <stdint.h>
 
-uint8_t Mapper000::ppu_map_read(uint16_t addr, uint16_t *mapped_addr)
+uint8_t Mapper000::ppu_map_read(uint16_t addr, uint32_t *mapped_addr)
 {
 	if (addr >= 0x0000 && addr <= 0x1FFF)
 	{
@@ -13,7 +13,7 @@ uint8_t Mapper000::ppu_map_read(uint16_t addr, uint16_t *mapped_addr)
 	return false;
 }
 
-uint8_t Mapper000::ppu_map_write(uint16_t addr, uint16_t *mapped_addr)
+uint8_t Mapper000::ppu_map_write(uint16_t addr, uint32_t *mapped_addr)
 {
 	// The system cannot write to the cartridge so 
 	//	this is always rejected.
@@ -22,7 +22,7 @@ uint8_t Mapper000::ppu_map_write(uint16_t addr, uint16_t *mapped_addr)
 }
 
 
-uint8_t Mapper000::cpu_map_read(uint16_t addr, uint16_t *mapped_addr)
+uint8_t Mapper000::cpu_map_read(uint16_t addr, uint32_t *mapped_addr)
 {
 	if (addr >= 0x8000 && addr <= 0xFFFF)
 	{
@@ -34,7 +34,7 @@ uint8_t Mapper000::cpu_map_read(uint16_t addr, uint16_t *mapped_addr)
 	return false;
 }
 
-uint8_t Mapper000::cpu_map_write(uint16_t addr, uint16_t *mapped_addr, uint8_t data)
+uint8_t Mapper000::cpu_map_write(uint16_t addr, uint32_t *mapped_addr, uint8_t data)
 {
 	if (addr >= 0x8000 && addr <= 0xFFFF)
 	{

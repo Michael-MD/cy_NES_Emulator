@@ -89,7 +89,7 @@ cdef class NES:
 			tv_system = flag_9 & 1	# (0: NTSC; 1: PAL)
 
 		# Instantiate cartridge class and load with program and palette data
-		self.cart = Cartridge(n_prog_chunks, 1 if using_char_RAM else n_char_chunks)
+		self.cart = Cartridge(n_prog_chunks, n_char_chunks)
 
 		self.cart.connect_mapper(self.n_mapper_ID, n_prog_chunks, n_char_chunks)
 
