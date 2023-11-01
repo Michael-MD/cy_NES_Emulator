@@ -1,5 +1,5 @@
 # distutils: language = c++
-# distutils: sources = [Mapper.cpp, Mapper000.cpp, Mapper002.cpp]
+# distutils: sources = [Mapper.cpp, Mapper000.cpp, Mapper002.cpp, Mapper003.cpp]
 
 import numpy as np
 from .Bus import Bus
@@ -44,6 +44,9 @@ cdef class Cartridge:
 		elif n_mapper_ID == 2:
 			self.mapper002 = new Mapper002(n_prog_chunks, n_char_chunks)
 			self.mapper = <Mapper*>self.mapper002
+		elif n_mapper_ID == 3:
+			self.mapper003 = new Mapper003(n_prog_chunks, n_char_chunks)
+			self.mapper = <Mapper*>self.mapper003
 		else:
 			raise Exception('Unsupported mapper.')
 
