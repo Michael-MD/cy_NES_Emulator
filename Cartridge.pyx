@@ -39,14 +39,11 @@ cdef class Cartridge:
 	# Connect Components
 	def connect_mapper(self, n_mapper_ID, n_prog_chunks, n_char_chunks):
 		if n_mapper_ID == 0:
-			self.mapper000 = new Mapper000(n_prog_chunks, n_char_chunks)
-			self.mapper = <Mapper*>self.mapper000
+			self.mapper = <Mapper*>new Mapper000(n_prog_chunks, n_char_chunks)
 		elif n_mapper_ID == 2:
-			self.mapper002 = new Mapper002(n_prog_chunks, n_char_chunks)
-			self.mapper = <Mapper*>self.mapper002
+			self.mapper = <Mapper*>new Mapper002(n_prog_chunks, n_char_chunks)
 		elif n_mapper_ID == 3:
-			self.mapper003 = new Mapper003(n_prog_chunks, n_char_chunks)
-			self.mapper = <Mapper*>self.mapper003
+			self.mapper = <Mapper*>new Mapper003(n_prog_chunks, n_char_chunks)
 		else:
 			raise Exception('Unsupported mapper.')
 

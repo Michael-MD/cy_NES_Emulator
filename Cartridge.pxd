@@ -17,9 +17,6 @@ cdef class Cartridge:
 	at address range 0x0000 to 0x1FFF.
 	"""
 	cdef Mapper* mapper
-	cdef Mapper000* mapper000
-	cdef Mapper002* mapper002
-	cdef Mapper003* mapper003
 
 	cdef uint8_t n_prog_chunks
 	cdef uint8_t n_char_chunks
