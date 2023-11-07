@@ -19,7 +19,7 @@ uint8_t Mapper003::ppu_map_write(uint16_t addr, uint32_t *mapped_addr)
 }
 
 
-uint8_t Mapper003::cpu_map_read(uint16_t addr, uint32_t *mapped_addr)
+uint8_t Mapper003::cpu_map_read(uint16_t addr, uint32_t *mapped_addr, uint8_t *data)
 {
 	if (addr >= 0x8000 && addr <= 0xFFFF)
 	{

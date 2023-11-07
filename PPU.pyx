@@ -672,16 +672,21 @@ cdef class PPU:
 			coarse_y = (addr >> 5) & 0x1F
 			coarse_x = (addr >> 0) & 0x1F
 
-			if self._v_mirroring:
+			if self._v_mirroring == 1:		# Vertical mirroring
 				if NT_x == 0:
 					self.nametable_a[coarse_y, coarse_x] = data
 				else:
 					self.nametable_b[coarse_y, coarse_x] = data
-			else:
+			elif self._v_mirroring == 0:	# Horizontal mirroring
 				if NT_y == 0:
 					self.nametable_a[coarse_y, coarse_x] = data
 				else:
 					self.nametable_b[coarse_y, coarse_x] = data
+			elif self._v_mirroring == 2:	# ONESCREEN_LO mirroring
+				self.nametable_a[coarse_y, coarse_x] = data
+			elif self._v_mirroring == 3:	# ONESCREEN_HI mirroring
+				self.nametable_b[coarse_y, coarse_x] = data
+
 
 		elif (addr >= 0x3F00) and (addr <= 0x3FFF):		# Palette memory
 			addr &= 0x1F	# address mod 32bytes
@@ -712,16 +717,20 @@ cdef class PPU:
 			coarse_y = (addr >> 5) & 0x1F
 			coarse_x = (addr >> 0) & 0x1F
 
-			if self._v_mirroring:
-				if NT_x == 0:
+			if self._v_mirroring == 1:		# Vertical mirroring
+				if NT_x == 0: 	
 					data = self.nametable_a[coarse_y, coarse_x]
 				else:
 					data = self.nametable_b[coarse_y, coarse_x]
-			else:
+			elif self._v_mirroring == 0: 	# Horizontal mirroring
 				if NT_y == 0:
 					data = self.nametable_a[coarse_y, coarse_x]
 				else:
 					data = self.nametable_b[coarse_y, coarse_x]
+			elif self._v_mirroring == 2:	# ONESCREEN_LO mirroring
+				self.nametable_a[coarse_y, coarse_x] = data
+			elif self._v_mirroring == 3:	# ONESCREEN_HI mirroring
+				self.nametable_b[coarse_y, coarse_x] = data
 
 		elif (addr >= 0x3F00) and (addr <= 0x3FFF):		# Palette memory
 			addr &= 0x1F	# address mod 32bytes

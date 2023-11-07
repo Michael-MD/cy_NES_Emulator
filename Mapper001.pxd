@@ -1,8 +1,8 @@
-cdef extern from "Mapper000.hpp":
-    cdef cppclass Mapper000:
+cdef extern from "Mapper001.hpp":
+    cdef cppclass Mapper001:
         unsigned char prog_banks
         unsigned char char_banks
-        Mapper000(unsigned char prog_banks, unsigned char char_banks) except +
+        Mapper001(unsigned char prog_banks, unsigned char char_banks) except +
 
         unsigned char ppu_map_read(unsigned short addr, unsigned int *mapped_addr)
         unsigned char ppu_map_write(unsigned short addr, unsigned int *mapped_addr)

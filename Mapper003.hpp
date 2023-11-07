@@ -13,7 +13,7 @@ public:
 	uint8_t ppu_map_read(uint16_t addr, uint32_t *mapped_addr) override;
 	uint8_t ppu_map_write(uint16_t addr, uint32_t *mapped_addr) override;
 
-	uint8_t cpu_map_read(uint16_t addr, uint32_t *mapped_addr) override;
+	uint8_t cpu_map_read(uint16_t addr, uint32_t *mapped_addr, uint8_t *data) override;
 	uint8_t cpu_map_write(uint16_t addr, uint32_t *mapped_addr, uint8_t data) override;
 
 private:

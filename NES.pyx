@@ -89,8 +89,8 @@ cdef class NES:
 			tv_system = flag_9 & 1	# (0: NTSC; 1: PAL)
 
 		# Instantiate cartridge class and load with program and palette data
-		self.cart = Cartridge(n_prog_chunks, n_char_chunks)
-
+		self.cart = Cartridge(n_prog_chunks, n_char_chunks, mirroring)
+		
 		self.cart.connect_mapper(self.n_mapper_ID, n_prog_chunks, n_char_chunks)
 
 		offset = 0
@@ -106,7 +106,7 @@ cdef class NES:
 			self.cart.v_char_memory[:] = rom[v_char_memory_start:v_char_memory_end]
 
 		# Set up NES system components
-		self.bus = Bus()
+		self.bus = Bus(self.n_mapper_ID)
 		self.cpu = CPU6502()
 		self.ppu = PPU()
 

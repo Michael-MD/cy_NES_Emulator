@@ -3,6 +3,7 @@
 
 from Mapper cimport Mapper
 from Mapper000 cimport Mapper000
+from Mapper001 cimport Mapper001
 from Mapper002 cimport Mapper002
 from Mapper003 cimport Mapper003
 
@@ -17,9 +18,11 @@ cdef class Cartridge:
 	at address range 0x0000 to 0x1FFF.
 	"""
 	cdef Mapper* mapper
+	cdef int n_mapper_ID
 
 	cdef uint8_t n_prog_chunks
 	cdef uint8_t n_char_chunks
+	cdef uint8_t _v_mirroring
 	cdef uint8_t[:] _v_prog_memory
 	cdef uint8_t[:] _v_char_memory
 

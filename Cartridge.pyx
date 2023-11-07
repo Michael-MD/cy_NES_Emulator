@@ -1,15 +1,17 @@
 # distutils: language = c++
-# distutils: sources = [Mapper.cpp, Mapper000.cpp, Mapper002.cpp, Mapper003.cpp]
+# distutils: sources = [Mapper.cpp, Mapper000.cpp, Mapper001.cpp, Mapper002.cpp, Mapper003.cpp]
 
 import numpy as np
 from .Bus import Bus
 
 cdef class Cartridge:
-	def __cinit__(self, uint8_t n_prog_chunks, uint8_t n_char_chunks):
+	def __cinit__(self, uint8_t n_prog_chunks, uint8_t n_char_chunks, mirroring):
 		# self.mapper = None
+		self.n_mapper_ID = 0
 
 		self.n_prog_chunks = n_prog_chunks
 		self.n_char_chunks = n_char_chunks
+		self._v_mirroring = mirroring
 		self._v_prog_memory = np.zeros(n_prog_chunks * 16 * 1024, dtype=np.uint8)	# Single chunk 16kB
 
 		if n_char_chunks == 0:
@@ -40,12 +42,14 @@ cdef class Cartridge:
 	def connect_mapper(self, n_mapper_ID, n_prog_chunks, n_char_chunks):
 		if n_mapper_ID == 0:
 			self.mapper = <Mapper*>new Mapper000(n_prog_chunks, n_char_chunks)
+		elif n_mapper_ID == 1:
+			self.mapper = <Mapper*>new Mapper001(n_prog_chunks, n_char_chunks)
 		elif n_mapper_ID == 2:
 			self.mapper = <Mapper*>new Mapper002(n_prog_chunks, n_char_chunks)
 		elif n_mapper_ID == 3:
 			self.mapper = <Mapper*>new Mapper003(n_prog_chunks, n_char_chunks)
 		else:
-			raise Exception('Unsupported mapper.')
+			raise Exception(f'Unsupported mapper {n_mapper_ID}.')
 
 	# PPU with internal bus communication
 	cdef uint8_t ppu_write(self, uint16_t addr, uint8_t data):
@@ -82,9 +86,13 @@ cdef class Cartridge:
 	cpdef (uint8_t, uint8_t) cpu_read(self, uint16_t addr):
 		cdef uint32_t mapped_addr
 		cdef uint8_t valid_addr
-		valid_addr = self.mapper.cpu_map_read(addr, &mapped_addr)
+		cdef uint8_t data
+
+		valid_addr = self.mapper.cpu_map_read(addr, &mapped_addr, &data)
 		if valid_addr:
 			if mapped_addr != 0xFFFFFFFF:
 				return self._v_prog_memory[mapped_addr], True
-			return 0x00, True
+			else:
+				return data, True
+
 		return 0x00, False

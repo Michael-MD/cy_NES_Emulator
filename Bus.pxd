@@ -13,6 +13,7 @@ cdef class Bus:
 	cdef int n_system_clock_counter
 	cdef uint8_t _controller[2]
 	cdef uint8_t _controller_state[2]
+	cdef int n_mapper_ID
 
 	cdef uint8_t dma_page
 	cdef uint8_t dma_addr
