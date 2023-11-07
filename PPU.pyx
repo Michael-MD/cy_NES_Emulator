@@ -672,6 +672,9 @@ cdef class PPU:
 			coarse_y = (addr >> 5) & 0x1F
 			coarse_x = (addr >> 0) & 0x1F
 
+			if self.cartridge.n_mapper_ID == 1:	# Check if mapper has capability to change mirroring mode
+				self.v_mirroring = self.cartridge.v_mirroring
+
 			if self._v_mirroring == 1:		# Vertical mirroring
 				if NT_x == 0:
 					self.nametable_a[coarse_y, coarse_x] = data
@@ -682,11 +685,6 @@ cdef class PPU:
 					self.nametable_a[coarse_y, coarse_x] = data
 				else:
 					self.nametable_b[coarse_y, coarse_x] = data
-			elif self._v_mirroring == 2:	# ONESCREEN_LO mirroring
-				self.nametable_a[coarse_y, coarse_x] = data
-			elif self._v_mirroring == 3:	# ONESCREEN_HI mirroring
-				self.nametable_b[coarse_y, coarse_x] = data
-
 
 		elif (addr >= 0x3F00) and (addr <= 0x3FFF):		# Palette memory
 			addr &= 0x1F	# address mod 32bytes
@@ -727,10 +725,6 @@ cdef class PPU:
 					data = self.nametable_a[coarse_y, coarse_x]
 				else:
 					data = self.nametable_b[coarse_y, coarse_x]
-			elif self._v_mirroring == 2:	# ONESCREEN_LO mirroring
-				self.nametable_a[coarse_y, coarse_x] = data
-			elif self._v_mirroring == 3:	# ONESCREEN_HI mirroring
-				self.nametable_b[coarse_y, coarse_x] = data
 
 		elif (addr >= 0x3F00) and (addr <= 0x3FFF):		# Palette memory
 			addr &= 0x1F	# address mod 32bytes

@@ -9,3 +9,7 @@ Mapper::Mapper(uint8_t prog_banks, uint8_t char_banks)
 
 Mapper::~Mapper() {};
 
+int Mapper::get_mirroring_mode(void)
+{
+	return mirroring;
+}

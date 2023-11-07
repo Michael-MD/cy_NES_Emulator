@@ -7,8 +7,6 @@ from .Bus import Bus
 cdef class Cartridge:
 	def __cinit__(self, uint8_t n_prog_chunks, uint8_t n_char_chunks, mirroring):
 		# self.mapper = None
-		self.n_mapper_ID = 0
-
 		self.n_prog_chunks = n_prog_chunks
 		self.n_char_chunks = n_char_chunks
 		self._v_mirroring = mirroring
@@ -31,6 +29,10 @@ cdef class Cartridge:
 		# self._v_char_memory_nd = self._v_char_memory.reshape((n_char_chunks, 2, 16, 16, 2, 8))
 
 	@property
+	def v_mirroring(self):
+		return self._v_mirroring
+
+	@property
 	def v_prog_memory(self):
 		return self._v_prog_memory
 
@@ -40,6 +42,7 @@ cdef class Cartridge:
 
 	# Connect Components
 	def connect_mapper(self, n_mapper_ID, n_prog_chunks, n_char_chunks):
+		self.n_mapper_ID = n_mapper_ID
 		if n_mapper_ID == 0:
 			self.mapper = <Mapper*>new Mapper000(n_prog_chunks, n_char_chunks)
 		elif n_mapper_ID == 1:
@@ -77,6 +80,10 @@ cdef class Cartridge:
 		cdef uint32_t mapped_addr
 		cdef uint8_t valid_addr
 		valid_addr = self.mapper.cpu_map_write(addr, &mapped_addr, data)
+
+		if self.n_mapper_ID == 1:	# Check if mapper has capability to change mirroring mode
+			self._v_mirroring = self.mapper.get_mirroring_mode()
+
 		if valid_addr:
 			if mapped_addr != 0xFFFFFFFF:
 				self._v_prog_memory[mapped_addr] = data

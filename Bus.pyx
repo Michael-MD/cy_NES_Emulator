@@ -14,7 +14,7 @@ cdef class Bus:
 		self.ppu = None
 		self.cartridge = None
 		self.cpu_ram = np.zeros(2 * 1024, dtype=np.uint8)	# 2kB CPU RAM
-		self.n_mapper_ID = 0
+		self.n_mapper_ID = n_mapper_ID
 		self.n_system_clock_counter = 0
 
 		# Controller state
@@ -84,8 +84,6 @@ cdef class Bus:
 			memmory ranges. We have the read and write return if the
 			value specified is in the cartridge addressable range.
 			"""
-			if self.n_mapper_ID == 1:	# Check if mapper has capability to change mirroring mode
-				self.ppu.v_mirroring = self.ppu.cartridge.mirroring
 		elif addr >= 0x0000 and addr <= 0x1FFF:		# Write to CPU RAM
 			self.cpu_ram[addr & 0x07FF] = data		# Mirroring 2kB range to fill 8kB
 		elif addr >= 0x2000 and addr <= 0x3FFF:		# Write to PPU

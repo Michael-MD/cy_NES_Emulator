@@ -142,8 +142,8 @@ uint8_t Mapper001::cpu_map_write(uint16_t addr, uint32_t *mapped_addr, uint8_t d
 
 					switch (controlReg & 0x03)
 					{
-					case 0: mirroring = ONESCREEN_LO ; break;
-					case 1: mirroring = ONESCREEN_HI ; break;
+					case 0: mirroring = ONESCREEN_LO; break;
+					case 1: mirroring = ONESCREEN_HI; break;
 					case 2: mirroring = VERTICAL; 	break;
 					case 3: mirroring = HORIZONTAL; break;
 					}

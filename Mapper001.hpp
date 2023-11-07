@@ -4,14 +4,6 @@
 #include "Mapper.hpp"
 #include <stdint.h>
 
-enum mirrormode
-{
-	HORIZONTAL,
-	VERTICAL,
-	ONESCREEN_LO,
-	ONESCREEN_HI,
-};
-
 class Mapper001 : public Mapper
 {
 public:
@@ -22,8 +14,6 @@ public:
 
 	uint8_t cpu_map_read(uint16_t addr, uint32_t *mapped_addr, uint8_t *data) override;
 	uint8_t cpu_map_write(uint16_t addr, uint32_t *mapped_addr, uint8_t data) override;
-
-	mirrormode mirroring;
 
 private:
 	uint8_t char_bank_select = 0;
