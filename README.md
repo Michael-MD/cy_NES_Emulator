@@ -1,6 +1,6 @@
 # cy_NES_Emulator
-Nes system in cython with joystick support. 
-This project was heavily inspired from javidx9 (https://www.youtube.com/@javidx9) so thanks to him.
+Nes system in cython with joystick support. Tested on Windows 10 and Linux Ubuntu I don't see why it wouldn't work on macOS.
+This project was heavily inspired from javidx9 (https://www.youtube.com/@javidx9) so huge thanks to him.
 
 <img src="smb.gif" width="400"/>
 
