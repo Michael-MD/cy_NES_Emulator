@@ -70,7 +70,7 @@ The emulator has keyboard and joystick support. If you plug in another controlle
 		<td> A </td>
 		<td> x </td>
 		<td> A </td>
-		<td> X </td>
+		<td> ✕ </td>
 	</tr>
 	<tr>
 		<td> B </td>
