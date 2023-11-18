@@ -4,10 +4,12 @@ cdef extern from "stdint.h":
 
 from .PPU cimport PPU
 from .CPU6502 cimport CPU6502
+from .APU cimport APU
 
 cdef class Bus:
 	cdef CPU6502 cpu
 	cdef PPU ppu
+	cdef APU apu
 	cdef object cartridge
 	cdef uint8_t cpu_ram[2048]
 	cdef int n_system_clock_counter

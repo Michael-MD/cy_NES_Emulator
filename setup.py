@@ -19,6 +19,7 @@ setup(
     	'CPU6502.pyx', 
     	'Bus.pyx',
     	'PPU.pyx',
+    	'APU.pyx',
     	'Cartridge.pyx',
     	# 'Screen.pyx',
     	'NES.pyx',

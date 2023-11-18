@@ -1,17 +1,15 @@
 # distutils: language = c++
 # cython: cflags=-O3, boundscheck=False, wraparound=False, cdivision=True, nonecheck=False, initializedcheck=False, overflowcheck=False
 
-cdef extern from "stdint.h":
-	ctypedef unsigned char uint8_t
-	ctypedef unsigned short uint16_t
-
 
 import numpy as np
+from .APU cimport APU
 
 cdef class Bus:
 	def __cinit__(self, int n_mapper_ID):
 		self.cpu = None
 		self.ppu = None
+		self.apu = APU()
 		self.cartridge = None
 		self.cpu_ram = np.zeros(2 * 1024, dtype=np.uint8)	# 2kB CPU RAM
 		self.n_mapper_ID = n_mapper_ID
@@ -58,6 +56,7 @@ cdef class Bus:
 
 				else:
 					self.cpu.clock()
+					self.apu.clock()
 
 			if self.ppu.nmi:
 				self.ppu.nmi = False
@@ -88,6 +87,8 @@ cdef class Bus:
 			self.cpu_ram[addr & 0x07FF] = data		# Mirroring 2kB range to fill 8kB
 		elif addr >= 0x2000 and addr <= 0x3FFF:		# Write to PPU
 			self.ppu.cpu_write(addr & 0x0007, data)		# PPU has 8 registers
+		elif (addr >= 0x4000 and addr <= 0x4013) or (addr == 0x4015) or (addr == 0x4017):	# Memory mapped APU
+			self.apu.cpu_write(addr, data)
 		elif addr == 0x4016 or addr == 0x4017:		# Controller Memory mapped IO
 			self._controller_state[addr&0x0001] = self._controller[addr&0x0001]&0xFF
 		elif addr == 0x4014:
