@@ -24,13 +24,13 @@ cdef class Channel:
 		self._enable = False
 
 		# Define and start audio stream (non-blocking)
-		stream = p.open(format=pyaudio.paFloat32,
+		self.stream = p.open(format=pyaudio.paFloat32,
 				channels=1,
 				rate=self.fs,
 				output=True,
 				frames_per_buffer=buffer_size,
 				stream_callback=self.update_buffer)
-		stream.start_stream()
+		self.stream.start_stream()
 
 	def update_buffer(self, in_data, frame_count, time_info, status):
 		if self.param_changed:
@@ -39,7 +39,7 @@ cdef class Channel:
 		if len(self.buffer) < frame_count:
 			self.buffer = np.append(self.buffer, self.wave)
 
-		samples_to_play = np.copy(self.buffer[:frame_count])
+		samples_to_play = np.copy(self.buffer[:frame_count]) * self.enable
 		self.buffer = self.buffer[frame_count:]
 
 		return (samples_to_play.tobytes(), pyaudio.paContinue)
@@ -55,11 +55,6 @@ cdef class Channel:
 	def enable(self, v):
 		if self._enable != v:
 			self._enable = v
-
-			if self._enable:
-				self.param_changed = True
-			else:
-				self.wave = np.zeros(buffer_size, dtype=np.float32)
 
 	@property
 	def freq(self):
@@ -168,7 +163,7 @@ cdef class APU:
 			
 		elif addr == 0x4015:	# Status register Enable/Disable channels
 			self.pulse_1.enable = True if data & 0b01 else False
-			# self.pulse_2.enable = True if data & 0b10 else False
+			self.pulse_2.enable = True if data & 0b10 else False
 			# self.triangle_channel.enable = True if data & 0b100 else False
 			# self.noise_channel.enable = True if (data & 0b1000) else False
 

@@ -8,7 +8,7 @@ cdef class Channel:
 	cdef uint32_t fs
 	cdef float[:] buffer
 	cdef float[:] wave
-	# cdef object stream
+	cdef object stream
 	
 	cdef uint8_t param_changed
 
