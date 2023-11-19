@@ -5,21 +5,25 @@ cdef extern from "stdint.h":
 	ctypedef unsigned int uint32_t
 
 cdef class Channel:
-	cdef uint32_t channel_id
-	cdef object channel
+	cdef uint32_t fs
+	cdef float[:] buffer
+	cdef float[:] wave
+	# cdef object stream
+	
+	cdef uint8_t param_changed
 
-cdef class PulseWave(Channel):
-	cdef uint8_t enable
-	cdef uint8_t v
-	cdef float freq
+	cdef uint8_t _enable
+	cdef float _freq
 	cdef uint16_t timer
 
-	cdef float dc
+cdef class PulseWave(Channel):
+	cdef uint8_t v
+	cdef float _dc
 	cdef uint8_t C
 
 
+
 cdef class APU:
-	cdef uint32_t fs
 
 	cdef PulseWave pulse_1
 	cdef PulseWave pulse_2

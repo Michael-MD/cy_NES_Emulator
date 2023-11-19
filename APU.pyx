@@ -1,24 +1,97 @@
-import pygame
+import pyaudio
+import numpy as np
 
+"""
+The implementation of audio used here means buffer size sets 
+the limit on the minimal frequency that can be played since
+the buffer must be able to fit atleast a single period. The 
+minimial frequency is given by
+					
+					f_min = fs / buffer_size
+
+"""
+buffer_size = 200
+
+p = pyaudio.PyAudio()
 
 cdef class Channel:
-	def __cinit__(self, channel_id):
-		self.channel_id = channel_id
-		self.channel = pygame.mixer.Channel(channel_id)
+	def __cinit__(self):
+		self.fs = 44100
+		self.buffer = np.asarray([], dtype=np.float32)	# Audio buffer
+		self.wave = np.zeros(buffer_size, dtype=np.float32)
+		self.param_changed = False
+
+		# Define and start audio stream (non-blocking)
+		stream = p.open(format=pyaudio.paFloat32,
+				channels=1,
+				rate=self.fs,
+				output=True,
+				frames_per_buffer=buffer_size,
+				stream_callback=self.update_buffer)
+		stream.start_stream()
+
+	def update_buffer(self, in_data, frame_count, time_info, status):
+		if self.param_changed:
+			self.update_wave()
+
+		if len(self.buffer) < frame_count:
+			self.buffer = np.append(self.buffer, self.wave)
+
+		samples_to_play = np.copy(self.buffer[:frame_count])
+		self.buffer = self.buffer[frame_count:]
+
+		return (samples_to_play.tobytes(), pyaudio.paContinue)
+
+	def update_wave(self):	# Intended to be overwritten in derived class
+		self.param_changed = False
+
+	@property
+	def enable(self):
+		return self._enable
+
+	@enable.setter
+	def enable(self, v):
+		if self._enable != v:
+			self._enable = v
+
+			if self._enable:
+				self.param_changed = True
+			else:
+				self.wave = np.zeros(buffer_size, dtype=np.float32)
+
+	@property
+	def freq(self):
+		return self._freq
+
+	@freq.setter
+	def freq(self, v):
+		if self._freq != v:
+			self._freq = v
+			self.param_changed = True
+
+	def update_wave(self):
+
+
+		self.param_changed = False
 
 cdef class PulseWave(Channel):
-	def __cinit__(self, channel_id):
-		super().__init__(channel_id)
+	def __cinit__(self):
+		...
+
+	@property
+	def dc(self):
+		return self._dc
+
+	@dc.setter
+	def dc(self, v):
+		if self._dc != v:
+			self._dc = v
+			self.param_changed = True
 
 cdef class APU:
 	def __cinit__(self):
-		self.fs = 44100
-
-		pygame.mixer.init(self.fs, -16, 1, 512, allowedchanges=pygame.AUDIO_ALLOW_FREQUENCY_CHANGE)
-		pygame.mixer.set_num_channels(5)	# Create 5 channels
-
-		self.pulse_1 = PulseWave(0)
-		self.pulse_2 = PulseWave(1)
+		self.pulse_1 = PulseWave()
+		self.pulse_2 = PulseWave()
 
 	cdef void clock(self):
 		...
@@ -72,7 +145,7 @@ cdef class APU:
 			
 		elif addr == 0x4015:	# Status register Enable/Disable channels
 			self.pulse_1.enable = True if data & 0b01 else False
-			self.pulse_2.enable = True if data & 0b10 else False
+			# self.pulse_2.enable = True if data & 0b10 else False
 			# self.triangle_channel.enable = True if data & 0b100 else False
 			# self.noise_channel.enable = True if (data & 0b1000) else False
 
