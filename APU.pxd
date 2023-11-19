@@ -17,7 +17,7 @@ cdef class Channel:
 	cdef uint16_t timer
 
 cdef class PulseWave(Channel):
-	cdef uint8_t v
+	cdef uint8_t _v
 	cdef float _dc
 	cdef uint8_t C
 

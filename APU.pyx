@@ -20,6 +20,8 @@ cdef class Channel:
 		self.buffer = np.asarray([], dtype=np.float32)	# Audio buffer
 		self.wave = np.zeros(buffer_size, dtype=np.float32)
 		self.param_changed = False
+		self._freq = 440
+		self._enable = False
 
 		# Define and start audio stream (non-blocking)
 		stream = p.open(format=pyaudio.paFloat32,
@@ -70,8 +72,6 @@ cdef class Channel:
 			self.param_changed = True
 
 	def update_wave(self):
-
-
 		self.param_changed = False
 
 cdef class PulseWave(Channel):
@@ -87,6 +87,29 @@ cdef class PulseWave(Channel):
 		if self._dc != v:
 			self._dc = v
 			self.param_changed = True
+
+	@property
+	def v(self):
+		return self._v
+
+	@v.setter
+	def v(self, vv):
+		if self._v != vv:
+			self._v = vv
+			self.param_changed = True
+
+	def update_wave(self):
+		cycles = int(buffer_size/self.fs*self.freq)+1
+		num_samples = int(np.round(self.fs / self.freq))
+		t = np.arange(num_samples) / self.fs
+
+		# TODO: Temporary
+		signal = np.zeros(num_samples)
+		signal[:int(num_samples * self.dc)] = .1 * self.v / 15
+
+		self.wave = np.tile(signal.astype(np.float32), cycles)
+
+		self.param_changed = False
 
 cdef class APU:
 	def __cinit__(self):
