@@ -94,7 +94,7 @@ cdef class PulseWave(Channel):
 			self.param_changed = True
 
 	def update_wave(self):
-		cycles = int(buffer_size/self.fs*self.freq)+1
+		cycles = int(np.ceil(buffer_size/self.fs*self.freq)+1)
 		num_samples = int(np.round(self.fs / self.freq))
 		t = np.arange(num_samples) / self.fs
 
