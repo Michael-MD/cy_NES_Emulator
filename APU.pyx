@@ -14,6 +14,50 @@ buffer_size = 200
 
 p = pyaudio.PyAudio()
 
+
+cdef class Divider:
+	def __cinit__(self):
+		self.period = 0
+		self.counter = 0
+
+	cdef uint8_t clock(self):
+		if self.counter == 0:
+			self.reload()
+			return 1
+		else:
+			self.counter -= 1
+			return 0
+
+	cdef void reload(self):
+		self.counter = self.period
+
+
+cdef class Envelope:
+	def __init__(self):
+		self.start = 0
+		self.decay_lvl = 0
+		self.loop = 0
+		self.divider = Divider()
+
+	cdef uint8_t clock(self):
+		if self.start == 0:
+			if self.divider.clock() == 1:
+
+				if self.decay_lvl == 0:
+					if self.loop:
+						self.decay_lvl = 15
+				else:
+					self.decay_lvl -= 1
+				
+				return 1
+
+		else:
+			self.start = 0
+			self.decay_lvl = 15
+			self.divider.reload()
+
+		return 0
+
 cdef class Channel:
 	def __cinit__(self):
 		self.fs = 44100
@@ -35,6 +79,7 @@ cdef class Channel:
 	def update_buffer(self, in_data, frame_count, time_info, status):
 		if self.param_changed:
 			self.update_wave()
+			self.param_changed = False
 
 		if len(self.buffer) < frame_count:
 			self.buffer = np.append(self.buffer, self.wave)
@@ -45,7 +90,7 @@ cdef class Channel:
 		return (samples_to_play.tobytes(), pyaudio.paContinue)
 
 	def update_wave(self):	# Intended to be overwritten in derived class
-		self.param_changed = False
+		...
 
 	@property
 	def enable(self):
@@ -66,12 +111,10 @@ cdef class Channel:
 			self._freq = v
 			self.param_changed = True
 
-	def update_wave(self):
-		self.param_changed = False
 
 cdef class PulseWave(Channel):
 	def __cinit__(self):
-		...
+		self.envelope = Envelope()
 
 	@property
 	def dc(self):
@@ -84,6 +127,22 @@ cdef class PulseWave(Channel):
 			self.param_changed = True
 
 	@property
+	def volume(self):
+		return self._volume
+
+	@volume.setter
+	def volume(self, vv):
+		if self._volume != vv:
+
+			if self.C == 1:
+				self._volume = vv / 15
+			else:
+				self._volume = self.envelope.decay_lvl / 15
+
+			# TODO: modify wave rather than recalc
+			self.param_changed = True
+
+	@property
 	def v(self):
 		return self._v
 
@@ -91,20 +150,20 @@ cdef class PulseWave(Channel):
 	def v(self, vv):
 		if self._v != vv:
 			self._v = vv
-			self.param_changed = True
+
+			self.envelope.divider.period = vv
+
+			self.volume = vv
 
 	def update_wave(self):
 		cycles = int(np.ceil(buffer_size/self.fs*self.freq)+1)
 		num_samples = int(np.round(self.fs / self.freq))
 		t = np.arange(num_samples) / self.fs
 
-		# TODO: Temporary
 		signal = np.zeros(num_samples)
-		signal[:int(num_samples * self.dc)] = .1 * self.v / 15
+		signal[:int(num_samples * self.dc)] = .1 * self.volume
 
 		self.wave = np.tile(signal.astype(np.float32), cycles)
-
-		self.param_changed = False
 
 cdef class APU:
 	def __cinit__(self):

@@ -4,6 +4,21 @@ cdef extern from "stdint.h":
 	ctypedef short int16_t
 	ctypedef unsigned int uint32_t
 
+cdef class Divider:
+	cdef uint16_t period
+	cdef uint16_t counter
+
+	cdef uint8_t clock(self)
+	cdef void reload(self)
+
+cdef class Envelope:
+	cdef uint8_t start
+	cdef uint8_t loop
+	cdef uint16_t decay_lvl
+	cdef Divider divider
+
+	cdef uint8_t clock(self)
+
 cdef class Channel:
 	cdef uint32_t fs
 	cdef float[:] buffer
@@ -18,10 +33,11 @@ cdef class Channel:
 
 cdef class PulseWave(Channel):
 	cdef uint8_t _v
+	cdef float _volume
 	cdef float _dc
 	cdef uint8_t C
-
-
+	
+	cdef Envelope envelope
 
 cdef class APU:
 
