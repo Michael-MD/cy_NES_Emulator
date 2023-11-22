@@ -181,7 +181,6 @@ cdef class APU:
 			if self.pulse_2.C != 1:
 				self.pulse_2.param_changed = True
 
-
 	cdef void half_frame_clock(self):
 		...
 
@@ -243,6 +242,7 @@ cdef class APU:
 				self.pulse_1.dc = .75
 
 			self.pulse_1.C = (data>>4)&0x01
+			self.pulse_1.envelope.loop = (data>>5)&0x01
 			self.pulse_1.v = data&0x0F
 
 		elif addr == 0x4002:	# Pulse 1 lo bit t
@@ -251,6 +251,8 @@ cdef class APU:
 		elif addr == 0x4003:	# Pulse 1 hi bit t
 			self.pulse_1.timer = ((data&0b111)<<8) | (self.pulse_1.timer&0x000FF)
 			self.pulse_1.freq = 1.789773*1e6 / (16*(self.pulse_1.timer+1))
+
+			self.pulse_1.envelope.start = 1
 
 		elif addr == 0x4004:	# Pulse 2 duty cycle
 			if (data>>6) == 0:	# 12.5% d.c
@@ -266,6 +268,7 @@ cdef class APU:
 				self.pulse_2.dc = .75
 
 			self.pulse_2.C = (data>>4)&0x01
+			self.pulse_2.envelope.loop = (data>>5)&0x01
 			self.pulse_2.v = data&0x0F
 
 		elif addr == 0x4006:	# Pulse 2 lo bit t
@@ -274,6 +277,8 @@ cdef class APU:
 		elif addr == 0x4007:	# Pulse 2 hi bit t
 			self.pulse_2.timer = ((data&0b111)<<8) | (self.pulse_2.timer&0x000FF)
 			self.pulse_2.freq = 1789773 / (16*(self.pulse_2.timer+1))
+
+			self.pulse_2.envelope.start = 1
 			
 		elif addr == 0x4015:	# Status register Enable/Disable channels
 			self.pulse_1.enable = True if data & 0b01 else False
