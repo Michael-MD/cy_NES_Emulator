@@ -167,11 +167,66 @@ cdef class PulseWave(Channel):
 
 cdef class APU:
 	def __cinit__(self):
+		self.n_apu_clock_cycles = 0
+
 		self.pulse_1 = PulseWave()
 		self.pulse_2 = PulseWave()
 
-	cdef void clock(self):
+	cdef void quarter_frame_clock(self):
+		if self.pulse_1.envelope.clock():
+			if self.pulse_1.C != 1:
+				self.pulse_1.param_changed = True
+
+		if self.pulse_2.envelope.clock():
+			if self.pulse_2.C != 1:
+				self.pulse_2.param_changed = True
+
+
+	cdef void half_frame_clock(self):
 		...
+
+	cdef void clock(self):
+		self.n_apu_clock_cycles += 1
+
+		if self.n_apu_clock_cycles%2:		# 1 APU cycle = 2 CPU cycles
+			# Frame counter
+			self._fc_counter += 1
+
+			# Mode 0: 4-step mode
+			if self._fc_mode == 0:
+				if self._fc_counter%3728 == 0:
+					self.quarter_frame_clock()
+				elif self._fc_counter%7456 == 0:
+					self.quarter_frame_clock()
+					self.half_frame_clock()
+				elif self._fc_counter%11185 == 0:
+					self.quarter_frame_clock()
+				elif self._fc_counter%14916 == 0:
+					self.quarter_frame_clock()
+					self.half_frame_clock()
+
+					if self._fc_irq_inhibit == 0:
+						self._fc_irq = 1
+
+					self._fc_counter = 0
+
+
+			# Mode 1: 5-step mode
+			if self._fc_mode == 1:
+				if self._fc_counter%3728 == 0:
+					self.quarter_frame_clock()
+				elif self._fc_counter%7456 == 0:
+					self.quarter_frame_clock()
+					self.half_frame_clock()
+				elif self._fc_counter%11185 == 0:
+					self.quarter_frame_clock()
+				elif self._fc_counter%14914 == 0:
+					...	
+				elif self._fc_counter%18641 == 0:
+					self.quarter_frame_clock()
+					self.half_frame_clock()
+
+					self._fc_counter = 0
 
 	cdef void cpu_write(self, uint16_t addr, uint8_t data):
 		if addr == 0x4000:	# Pulse 1 duty cycle
@@ -225,6 +280,20 @@ cdef class APU:
 			self.pulse_2.enable = True if data & 0b10 else False
 			# self.triangle_channel.enable = True if data & 0b100 else False
 			# self.noise_channel.enable = True if (data & 0b1000) else False
+
+		elif addr == 0x4017:	# Frame counter status
+			self._fc_mode = (data&0x80)>>7 	# if mode=0: 4-step, mode=1: 5-step
+			self._fc_irq_inhibit = (data&0x40)>>6
+
+			if self._fc_mode == 0: 	# Mode 0
+				self._fc_irq = data&0x01
+				self._fc_length_counter = ((data&0b100)>>1)|(data&0x01)
+				self._fc_env_lin_counter = data&0x0F
+
+			elif self._fc_mode == 1: 	# Mode 1
+				self._fc_length_counter = ((data&0b1000)>>2)|(data&0x01)
+				self._fc_irq = 0
+				self._fc_env_lin_counter = ((data&0b11100)>>1)|(data&0x01)
 
 
 	cdef uint8_t cpu_read(self, uint16_t addr):
