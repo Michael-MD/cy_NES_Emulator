@@ -58,6 +58,44 @@ cdef class Envelope:
 
 		return 0
 
+cdef class Sweep:
+	def __cinit__(self, comp):
+		self.divider = Divider()
+		self.reload_f = 0
+		self.enable = 0
+		self.negate = 0
+		self.shift = 0
+		self.current_period = 0
+		self.target_period = 0
+		self.shift = 0
+		self.comp = comp
+
+	cdef void update_target_period(self):
+		# Calculate target period
+		cdef uint8_t deltat
+
+		deltat = self.current_period >> self.shift
+		if self.negate:
+			self.target_period = self.current_period - deltat - self.comp
+		else:
+			self.target_period = self.current_period + deltat
+
+		# Clamp target period to 0
+		if self.target_period < 0:
+			self.target_period = 0
+
+	cdef uint8_t clock(self):
+		self.update_target_period()
+
+		if self.reload_f:
+			self.divider.reload()
+			self.reload_f = 0
+		
+		if self.divider.clock() and self.enable and self.shift != 0:
+			return 1
+
+		return 0
+
 cdef class Channel:
 	def __cinit__(self):
 		self.fs = 44100
@@ -113,8 +151,9 @@ cdef class Channel:
 
 
 cdef class PulseWave(Channel):
-	def __cinit__(self):
+	def __cinit__(self, comp):
 		self.envelope = Envelope()
+		self.sweep = Sweep(comp)
 
 	@property
 	def dc(self):
@@ -150,18 +189,18 @@ cdef class PulseWave(Channel):
 	def v(self, vv):
 		if self._v != vv:
 			self._v = vv
-
 			self.envelope.divider.period = vv
-
 			self.volume = vv
 
 	def update_wave(self):
 		cycles = int(np.ceil(buffer_size/self.fs*self.freq)+1)
 		num_samples = int(np.round(self.fs / self.freq))
-		t = np.arange(num_samples) / self.fs
-
+		
 		signal = np.zeros(num_samples)
-		signal[:int(num_samples * self.dc)] = .1 * self.volume
+
+		if self.sweep_mute == 0:
+			t = np.arange(num_samples) / self.fs
+			signal[:int(num_samples * self.dc)] = .1 * self.volume
 
 		self.wave = np.tile(signal.astype(np.float32), cycles)
 
@@ -169,8 +208,8 @@ cdef class APU:
 	def __cinit__(self):
 		self.n_apu_clock_cycles = 0
 
-		self.pulse_1 = PulseWave()
-		self.pulse_2 = PulseWave()
+		self.pulse_1 = PulseWave(1)
+		self.pulse_2 = PulseWave(0)
 
 	cdef void quarter_frame_clock(self):
 		if self.pulse_1.envelope.clock():
@@ -182,7 +221,19 @@ cdef class APU:
 				self.pulse_2.param_changed = True
 
 	cdef void half_frame_clock(self):
-		...
+		self.pulse_1.sweep_mute = self.pulse_1.sweep.current_period < 8 or self.pulse_1.sweep.target_period > 0x07FF
+		self.pulse_2.sweep_mute = self.pulse_2.sweep.current_period < 8 or self.pulse_2.sweep.target_period > 0x07FF
+
+		# TODO: Sweep unit muting
+		if self.pulse_1.sweep.clock():
+			self.pulse_1.timer = self.pulse_1.sweep.target_period
+			self.pulse_1.sweep.current_period = self.pulse_1.sweep.target_period
+			self.pulse_1.freq = 1789773 / (16*(self.pulse_1.timer+1))
+
+		if self.pulse_2.sweep.clock():
+			self.pulse_2.timer = self.pulse_2.sweep.target_period
+			self.pulse_2.sweep.current_period = self.pulse_2.sweep.target_period
+			self.pulse_2.freq = 1789773 / (16*(self.pulse_2.timer+1))
 
 	cdef void clock(self):
 		self.n_apu_clock_cycles += 1
@@ -245,11 +296,22 @@ cdef class APU:
 			self.pulse_1.envelope.loop = (data>>5)&0x01
 			self.pulse_1.v = data&0x0F
 
+		elif addr == 0x4001:	# Set sweep unit parameters for pulse wave 1
+			self.pulse_1.sweep.enable = (data>>7)
+			self.pulse_1.sweep.divider.period = (data>>4)&0b111
+			self.pulse_1.sweep.negate = (data>>3)&0x01
+			self.pulse_1.sweep.shift = (data>>0)&0b111
+
+			self.pulse_1.sweep.reload_f = 1
+			self.pulse_1.sweep.update_target_period()
+
+
 		elif addr == 0x4002:	# Pulse 1 lo bit t
 			self.pulse_1.timer = (self.pulse_1.timer&0x0FF00)|data
 
 		elif addr == 0x4003:	# Pulse 1 hi bit t
 			self.pulse_1.timer = ((data&0b111)<<8) | (self.pulse_1.timer&0x000FF)
+			self.pulse_1.sweep.current_period = self.pulse_1.timer
 			self.pulse_1.freq = 1.789773*1e6 / (16*(self.pulse_1.timer+1))
 
 			self.pulse_1.envelope.start = 1
@@ -271,11 +333,21 @@ cdef class APU:
 			self.pulse_2.envelope.loop = (data>>5)&0x01
 			self.pulse_2.v = data&0x0F
 
+		elif addr == 0x4005:	# Set sweep unit parameters for pulse wave 2
+			self.pulse_2.sweep.enable = (data>>7)
+			self.pulse_2.sweep.divider.period = (data>>4)&0b111
+			self.pulse_2.sweep.negate = (data>>3)&0x01
+			self.pulse_2.sweep.shift = (data>>0)&0b111
+
+			self.pulse_2.sweep.reload_f = 1
+			self.pulse_2.sweep.update_target_period()
+
 		elif addr == 0x4006:	# Pulse 2 lo bit t
 			self.pulse_2.timer = (self.pulse_2.timer&0x0FF00)|data
 			
 		elif addr == 0x4007:	# Pulse 2 hi bit t
 			self.pulse_2.timer = ((data&0b111)<<8) | (self.pulse_2.timer&0x000FF)
+			self.pulse_2.sweep.current_period = self.pulse_2.timer
 			self.pulse_2.freq = 1789773 / (16*(self.pulse_2.timer+1))
 
 			self.pulse_2.envelope.start = 1
