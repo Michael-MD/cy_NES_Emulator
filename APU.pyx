@@ -65,14 +65,28 @@ cdef class Sweep:
 		self.enable = 0
 		self.negate = 0
 		self.shift = 0
-		self.current_period = 0
+		self._current_period = 0
 		self.target_period = 0
 		self.shift = 0
 		self.comp = comp
 
+	@property
+	def current_period(self):
+		return self._current_period
+
+	@current_period.setter
+	def current_period(self, v):
+		if self._current_period != v:
+			self._current_period = v
+
+			self.update_target_period()
+
+	cdef void update_muting(self):
+		self.sweep_mute = self.current_period < 8 or self.target_period > 0x07FF
+
 	cdef void update_target_period(self):
 		# Calculate target period
-		cdef uint8_t deltat
+		cdef uint16_t deltat
 
 		deltat = self.current_period >> self.shift
 		if self.negate:
@@ -83,6 +97,8 @@ cdef class Sweep:
 		# Clamp target period to 0
 		if self.target_period < 0:
 			self.target_period = 0
+
+		self.update_muting()
 
 	cdef uint8_t clock(self):
 		self.update_target_period()
@@ -198,7 +214,7 @@ cdef class PulseWave(Channel):
 		
 		signal = np.zeros(num_samples)
 
-		if self.sweep_mute == 0:
+		if self.sweep.sweep_mute == 0:
 			t = np.arange(num_samples) / self.fs
 			signal[:int(num_samples * self.dc)] = .1 * self.volume
 
@@ -221,10 +237,7 @@ cdef class APU:
 				self.pulse_2.param_changed = True
 
 	cdef void half_frame_clock(self):
-		self.pulse_1.sweep_mute = self.pulse_1.sweep.current_period < 8 or self.pulse_1.sweep.target_period > 0x07FF
-		self.pulse_2.sweep_mute = self.pulse_2.sweep.current_period < 8 or self.pulse_2.sweep.target_period > 0x07FF
 
-		# TODO: Sweep unit muting
 		if self.pulse_1.sweep.clock():
 			self.pulse_1.timer = self.pulse_1.sweep.target_period
 			self.pulse_1.sweep.current_period = self.pulse_1.sweep.target_period

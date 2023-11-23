@@ -26,11 +26,14 @@ cdef class Sweep:
 	cdef uint8_t enable 
 	cdef uint8_t negate 
 	cdef uint8_t shift 
-	cdef uint32_t current_period 
+	cdef uint32_t _current_period 
 	cdef uint32_t target_period 
 	cdef uint8_t comp
+	cdef uint8_t sweep_mute
 
 	cdef void update_target_period(self)
+	cdef void update_muting(self)
+	
 	cdef uint8_t clock(self)
 
 cdef class Channel:
@@ -50,10 +53,10 @@ cdef class PulseWave(Channel):
 	cdef float _volume
 	cdef float _dc
 	cdef uint8_t C
-	cdef uint8_t sweep_mute
 
 	cdef Envelope envelope
 	cdef Sweep sweep
+
 
 cdef class APU:
 	cdef uint32_t n_apu_clock_cycles
