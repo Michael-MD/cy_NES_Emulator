@@ -1,6 +1,8 @@
 import pyaudio
 import numpy as np
 
+from .length_conter_tbl import *
+
 """
 The implementation of audio used here means buffer size sets 
 the limit on the minimal frequency that can be played since
@@ -79,14 +81,11 @@ cdef class Sweep:
 		if self._current_period != v:
 			self._current_period = v
 
-			self.update_target_period()
-
-	cdef void update_muting(self):
-		self.sweep_mute = self.current_period < 8 or self.target_period > 0x07FF
+			self.update_target_period()		
 
 	cdef void update_target_period(self):
 		# Calculate target period
-		cdef uint16_t deltat
+		cdef int deltat
 
 		deltat = self.current_period >> self.shift
 		if self.negate:
@@ -98,7 +97,7 @@ cdef class Sweep:
 		if self.target_period < 0:
 			self.target_period = 0
 
-		self.update_muting()
+		self.sweep_mute = self.current_period < 8 or self.target_period > 0x07FF
 
 	cdef uint8_t clock(self):
 		self.update_target_period()
@@ -214,7 +213,7 @@ cdef class PulseWave(Channel):
 		
 		signal = np.zeros(num_samples)
 
-		if self.sweep.sweep_mute == 0:
+		if self.sweep.sweep_mute == 0 and self.length_counter > 0:
 			t = np.arange(num_samples) / self.fs
 			signal[:int(num_samples * self.dc)] = .1 * self.volume
 
@@ -252,6 +251,7 @@ cdef class APU:
 		self.n_apu_clock_cycles += 1
 
 		if self.n_apu_clock_cycles%2:		# 1 APU cycle = 2 CPU cycles
+			
 			# Frame counter
 			self._fc_counter += 1
 
@@ -291,6 +291,15 @@ cdef class APU:
 
 					self._fc_counter = 0
 
+			# Increment length counters
+			if self._fc_counter == 0:
+				if self.pulse_1.H==0 and self.pulse_1.length_counter != 0:
+					print(self.pulse_1.length_counter)
+					self.pulse_1.length_counter -= 1
+
+				if self.pulse_2.H==0 and self.pulse_2.length_counter != 0:
+					self.pulse_2.length_counter -= 1
+
 	cdef void cpu_write(self, uint16_t addr, uint8_t data):
 		if addr == 0x4000:	# Pulse 1 duty cycle
 			if (data>>6) == 0:	# 12.5% d.c
@@ -307,6 +316,7 @@ cdef class APU:
 
 			self.pulse_1.C = (data>>4)&0x01
 			self.pulse_1.envelope.loop = (data>>5)&0x01
+			self.pulse_1.H = self.pulse_1.envelope.loop
 			self.pulse_1.v = data&0x0F
 
 		elif addr == 0x4001:	# Set sweep unit parameters for pulse wave 1
@@ -327,7 +337,13 @@ cdef class APU:
 			self.pulse_1.sweep.current_period = self.pulse_1.timer
 			self.pulse_1.freq = 1.789773*1e6 / (16*(self.pulse_1.timer+1))
 
+			self.pulse_1.length_counter = length_conter_tbl[data>>3]
+
+			print(data>>3, self.pulse_1.length_counter)
+
 			self.pulse_1.envelope.start = 1
+
+			# TODO: Reset pulse channel phase
 
 		elif addr == 0x4004:	# Pulse 2 duty cycle
 			if (data>>6) == 0:	# 12.5% d.c
@@ -344,6 +360,7 @@ cdef class APU:
 
 			self.pulse_2.C = (data>>4)&0x01
 			self.pulse_2.envelope.loop = (data>>5)&0x01
+			self.pulse_2.H = self.pulse_2.envelope.loop
 			self.pulse_2.v = data&0x0F
 
 		elif addr == 0x4005:	# Set sweep unit parameters for pulse wave 2
@@ -363,6 +380,8 @@ cdef class APU:
 			self.pulse_2.sweep.current_period = self.pulse_2.timer
 			self.pulse_2.freq = 1789773 / (16*(self.pulse_2.timer+1))
 
+			self.pulse_2.length_counter = length_conter_tbl[data>>3]
+
 			self.pulse_2.envelope.start = 1
 			
 		elif addr == 0x4015:	# Status register Enable/Disable channels
@@ -370,6 +389,12 @@ cdef class APU:
 			self.pulse_2.enable = True if data & 0b10 else False
 			# self.triangle_channel.enable = True if data & 0b100 else False
 			# self.noise_channel.enable = True if (data & 0b1000) else False
+
+			if not self.pulse_1.enable:
+				self.pulse_1.length_counter = 0
+
+			if not self.pulse_2.enable:
+				self.pulse_2.length_counter = 0
 
 		elif addr == 0x4017:	# Frame counter status
 			self._fc_mode = (data&0x80)>>7 	# if mode=0: 4-step, mode=1: 5-step

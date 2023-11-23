@@ -32,8 +32,7 @@ cdef class Sweep:
 	cdef uint8_t sweep_mute
 
 	cdef void update_target_period(self)
-	cdef void update_muting(self)
-	
+
 	cdef uint8_t clock(self)
 
 cdef class Channel:
@@ -43,6 +42,8 @@ cdef class Channel:
 	cdef object stream
 	
 	cdef uint8_t param_changed
+	cdef uint8_t length_counter
+
 
 	cdef uint8_t _enable
 	cdef float _freq
@@ -53,6 +54,7 @@ cdef class PulseWave(Channel):
 	cdef float _volume
 	cdef float _dc
 	cdef uint8_t C
+	cdef uint8_t H
 
 	cdef Envelope envelope
 	cdef Sweep sweep
