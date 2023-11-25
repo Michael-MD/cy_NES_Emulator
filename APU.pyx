@@ -213,11 +213,12 @@ cdef class PulseWave(Channel):
 		cycles = int(np.ceil(buffer_size/self.fs*self.freq)+1)
 		num_samples = int(np.round(self.fs / self.freq))
 		
-		signal = np.zeros(num_samples)
+		cdef float A = .1 * self.volume
+		signal = np.full(num_samples, -A/2)
 
 		if self.sweep.sweep_mute == 0 and self.length_counter > 0:
 			t = np.arange(num_samples) / self.fs
-			signal[:int(num_samples * self.dc)] = .1 * self.volume
+			signal[:int(num_samples * self.dc)] = A/2
 
 		self.wave = np.tile(signal.astype(np.float32), cycles)
 
@@ -231,14 +232,13 @@ cdef class TriangleWave(Channel):
 	def update_wave(self):
 		cycles = int(np.ceil(buffer_size/self.fs*self.freq)+1)
 		num_samples = int(np.round(self.fs / self.freq))
-
-		signal = np.zeros(num_samples)
+		
+		cdef float A = .1
+		signal = np.full(num_samples, -A/2)
 
 		t = np.arange(num_samples) / self.fs
-		for n in range(1, 5, 2):
-			signal += pow(-1, (n-1)/2) * self.approx_sin(2 * np.pi * n * self.freq * t) / (n**2)
-
-		signal *= .1
+		signal[:int(num_samples * .5)] = A/2
+		signal = np.cumsum(signal) * 4 / num_samples - A/2
 
 		self.wave = np.tile(signal.astype(np.float32), cycles)
 
