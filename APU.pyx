@@ -361,6 +361,9 @@ cdef class APU:
 			self.pulse_1.sweep.current_period = self.pulse_1.timer
 			self.pulse_1.freq = 1.789773*1e6 / (16*(self.pulse_1.timer+1))
 
+			# Reset envelope period
+			self.pulse_1.envelope.decay_lvl = 15
+
 			if self.pulse_1.enable:
 				self.pulse_1.length_counter = length_conter_tbl[data>>3]
 
@@ -402,6 +405,9 @@ cdef class APU:
 			self.pulse_2.timer = ((data&0b111)<<8) | (self.pulse_2.timer&0x000FF)
 			self.pulse_2.sweep.current_period = self.pulse_2.timer
 			self.pulse_2.freq = 1789773 / (16*(self.pulse_2.timer+1))
+
+			# Reset envelope period
+			self.pulse_2.envelope.decay_lvl = 15
 
 			if self.pulse_2.enable:
 				self.pulse_2.length_counter = length_conter_tbl[data>>3]
