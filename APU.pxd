@@ -60,11 +60,15 @@ cdef class PulseWave(Channel):
 	cdef Sweep sweep
 
 
+cdef class TriangleWave(Channel):
+	cdef uint8_t C
+
 cdef class APU:
 	cdef uint32_t n_apu_clock_cycles
 
 	cdef PulseWave pulse_1
 	cdef PulseWave pulse_2
+	cdef TriangleWave triangle
 
 	# Frame counter
 	cdef uint8_t _fc_mode

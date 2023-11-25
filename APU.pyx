@@ -85,17 +85,15 @@ cdef class Sweep:
 
 	cdef void update_target_period(self):
 		# Calculate target period
-		cdef int deltat
+		cdef int deltat, tmp
 
 		deltat = self.current_period >> self.shift
 		if self.negate:
-			self.target_period = self.current_period - deltat - self.comp
+			tmp = self.current_period - deltat - self.comp
+			self.target_period = tmp if tmp>0 else 0 		# Clamp target period to 0
 		else:
 			self.target_period = self.current_period + deltat
 
-		# Clamp target period to 0
-		if self.target_period < 0:
-			self.target_period = 0
 
 		self.sweep_mute = self.current_period < 8 or self.target_period > 0x07FF
 
@@ -145,6 +143,7 @@ cdef class Channel:
 	def update_wave(self):	# Intended to be overwritten in derived class
 		...
 
+
 	@property
 	def enable(self):
 		return self._enable
@@ -153,6 +152,9 @@ cdef class Channel:
 	def enable(self, v):
 		if self._enable != v:
 			self._enable = v
+
+			if not self._enable:
+				self.wave = np.zeros(buffer_size, dtype=np.float32)
 
 	@property
 	def freq(self):
@@ -219,12 +221,35 @@ cdef class PulseWave(Channel):
 
 		self.wave = np.tile(signal.astype(np.float32), cycles)
 
+
+cdef class TriangleWave(Channel):
+	def approx_sin(self, t):
+		j = t * 0.15915
+		j = j - np.floor(j)
+		return (20.785 * j * (j-.5) * (j-1))
+
+	def update_wave(self):
+		cycles = int(np.ceil(buffer_size/self.fs*self.freq)+1)
+		num_samples = int(np.round(self.fs / self.freq))
+
+		signal = np.zeros(num_samples)
+
+		t = np.arange(num_samples) / self.fs
+		for n in range(1, 5, 2):
+			signal += pow(-1, (n-1)/2) * self.approx_sin(2 * np.pi * n * self.freq * t) / (n**2)
+
+		signal *= .1
+
+		self.wave = np.tile(signal.astype(np.float32), cycles)
+
+
 cdef class APU:
 	def __cinit__(self):
 		self.n_apu_clock_cycles = 0
 
 		self.pulse_1 = PulseWave(1)
 		self.pulse_2 = PulseWave(0)
+		self.triangle = TriangleWave()
 
 	cdef void quarter_frame_clock(self):
 		if self.pulse_1.envelope.clock():
@@ -294,7 +319,6 @@ cdef class APU:
 			# Increment length counters
 			if self._fc_counter == 0:
 				if self.pulse_1.H==0 and self.pulse_1.length_counter != 0:
-					print(self.pulse_1.length_counter)
 					self.pulse_1.length_counter -= 1
 
 				if self.pulse_2.H==0 and self.pulse_2.length_counter != 0:
@@ -337,9 +361,8 @@ cdef class APU:
 			self.pulse_1.sweep.current_period = self.pulse_1.timer
 			self.pulse_1.freq = 1.789773*1e6 / (16*(self.pulse_1.timer+1))
 
-			self.pulse_1.length_counter = length_conter_tbl[data>>3]
-
-			print(data>>3, self.pulse_1.length_counter)
+			if self.pulse_1.enable:
+				self.pulse_1.length_counter = length_conter_tbl[data>>3]
 
 			self.pulse_1.envelope.start = 1
 
@@ -380,14 +403,22 @@ cdef class APU:
 			self.pulse_2.sweep.current_period = self.pulse_2.timer
 			self.pulse_2.freq = 1789773 / (16*(self.pulse_2.timer+1))
 
-			self.pulse_2.length_counter = length_conter_tbl[data>>3]
+			if self.pulse_2.enable:
+				self.pulse_2.length_counter = length_conter_tbl[data>>3]
 
 			self.pulse_2.envelope.start = 1
-			
+		
+		elif addr == 0x400A:	# Triangle lo bit t
+			self.triangle.timer = (self.triangle.timer&0x0FF00)|data
+
+		elif addr == 0x400B:	# Triangle hi bit t
+			self.triangle.timer = ((data&0b111)<<8) | (self.triangle.timer&0x000FF)
+			self.triangle.freq = 1789773 / (32*(self.triangle.timer+1))
+
 		elif addr == 0x4015:	# Status register Enable/Disable channels
 			self.pulse_1.enable = True if data & 0b01 else False
 			self.pulse_2.enable = True if data & 0b10 else False
-			# self.triangle_channel.enable = True if data & 0b100 else False
+			self.triangle.enable = True if data & 0b100 else False
 			# self.noise_channel.enable = True if (data & 0b1000) else False
 
 			if not self.pulse_1.enable:
