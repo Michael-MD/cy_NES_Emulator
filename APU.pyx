@@ -94,7 +94,6 @@ cdef class Sweep:
 		else:
 			self.target_period = self.current_period + deltat
 
-
 		self.sweep_mute = self.current_period < 8 or self.target_period > 0x07FF
 
 	cdef uint8_t clock(self):
@@ -128,7 +127,7 @@ cdef class Channel:
 		self.stream.start_stream()
 
 	def update_buffer(self, in_data, frame_count, time_info, status):
-		if self.param_changed:
+		if self.param_changed and self.enable:
 			self.update_wave()
 			self.param_changed = False
 
@@ -154,6 +153,7 @@ cdef class Channel:
 			self._enable = v
 
 			if not self._enable:
+				# self.buffer = np.asarray([], dtype=np.float32)
 				self.wave = np.zeros(buffer_size, dtype=np.float32)
 
 	@property
@@ -254,10 +254,12 @@ cdef class APU:
 	cdef void quarter_frame_clock(self):
 		if self.pulse_1.envelope.clock():
 			if self.pulse_1.C != 1:
+				self.pulse_1.volume = self.pulse_1.envelope.decay_lvl / 15
 				self.pulse_1.param_changed = True
 
 		if self.pulse_2.envelope.clock():
 			if self.pulse_2.C != 1:
+				self.pulse_2.volume = self.pulse_2.envelope.decay_lvl / 15
 				self.pulse_2.param_changed = True
 
 	cdef void half_frame_clock(self):
@@ -413,6 +415,8 @@ cdef class APU:
 				self.pulse_2.length_counter = length_conter_tbl[data>>3]
 
 			self.pulse_2.envelope.start = 1
+
+			# TODO: Reset triangle reload flag
 		
 		elif addr == 0x400A:	# Triangle lo bit t
 			self.triangle.timer = (self.triangle.timer&0x0FF00)|data
