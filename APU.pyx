@@ -352,9 +352,11 @@ cdef class APU:
 				if self.pulse_2.H==0 and self.pulse_2.length_counter != 0:
 					self.pulse_2.length_counter -= 1
 
+				if self.triangle.C==0 and self.triangle.length_counter != 0:
+					self.triangle.length_counter -= 1
+
 
 				# Load/decrement triangle linear counter
-				# print(self.triangle.linear_counter_reload_f, self.triangle.linear_counter, self.triangle.freq)
 				if self.triangle.linear_counter_reload_f:
 					self.triangle.linear_counter = self.triangle.new_linear_counter
 					self.triangle.param_changed = True
