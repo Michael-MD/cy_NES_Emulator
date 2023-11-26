@@ -302,7 +302,9 @@ cdef class Noise(Channel):
 
 	cdef void update_wave(self):
 		A = .1
-		# self.wave = np.random.uniform(-A/2, A/2, buffer_size*6).astype(np.float32)
+
+		if self.length_counter > 0:
+			self.wave = (np.random.uniform(-A/2, A/2, buffer_size*6)*self.volume).astype(np.float32)
 
 
 cdef class APU:
@@ -391,6 +393,9 @@ cdef class APU:
 
 				if self.triangle.C==0 and self.triangle.length_counter != 0:
 					self.triangle.length_counter -= 1
+
+				if self.noise.H==0 and self.noise.length_counter != 0:
+					self.noise.length_counter -= 1
 
 
 				# Load/decrement triangle linear counter
@@ -511,23 +516,24 @@ cdef class APU:
 
 			self.triangle.linear_counter_reload_f = True
 
-		elif addr == 0x400C:
+		elif addr == 0x400C:		# Noise envelope
 			self.noise.C = (data>>4)&0x01
 			self.noise.envelope.loop = (data>>5)&0x01
 			self.noise.H = self.noise.envelope.loop
 			self.noise.v = data&0x0F
 
-		elif addr == 0x400E:
-			...
+		elif addr == 0x400E:		# Noise wave properties
+			self.noise.period = data&0x0F
+			self.noise.loop = data>>7
 
-		elif addr == 0x400F:
-			...
+		elif addr == 0x400F:		# Noise length counter
+			self.noise.length_counter = length_conter_tbl[data>>3]
 
 		elif addr == 0x4015:	# Status register Enable/Disable channels
 			self.pulse_1.enable = True if data & 0b01 else False
 			self.pulse_2.enable = True if data & 0b10 else False
 			self.triangle.enable = True if data & 0b100 else False
-			self.noise.enable = True if (data & 0b1000) else False
+			self.noise.enable = True if data & 0b1000 else False
 
 			if not self.pulse_1.enable:
 				self.pulse_1.length_counter = 0
