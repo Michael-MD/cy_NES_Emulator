@@ -268,6 +268,42 @@ cdef class TriangleWave(Channel):
 			np.zeros(buffer_size)
 
 
+cdef class Noise(Channel):
+	def __cinit__(self):
+		self.envelope = Envelope()
+
+	@property
+	def volume(self):
+		return self._volume
+
+	@volume.setter
+	def volume(self, vv):
+		if self._volume != vv:
+
+			if self.C == 1:
+				self._volume = vv / 15
+			else:
+				self._volume = self.envelope.decay_lvl / 15
+
+			# TODO: modify wave rather than recalc
+			self.param_changed = True
+
+	@property
+	def v(self):
+		return self._v
+
+	@v.setter
+	def v(self, vv):
+		if self._v != vv:
+			self._v = vv
+			self.envelope.divider.period = vv
+			self.volume = vv
+
+
+	cdef void update_wave(self):
+		A = .1
+		# self.wave = np.random.uniform(-A/2, A/2, buffer_size*6).astype(np.float32)
+
 
 cdef class APU:
 	def __cinit__(self):
@@ -276,6 +312,7 @@ cdef class APU:
 		self.pulse_1 = PulseWave(1)
 		self.pulse_2 = PulseWave(0)
 		self.triangle = TriangleWave()
+		self.noise = Noise()
 
 	cdef void quarter_frame_clock(self):
 		if self.pulse_1.envelope.clock():
@@ -474,11 +511,23 @@ cdef class APU:
 
 			self.triangle.linear_counter_reload_f = True
 
+		elif addr == 0x400C:
+			self.noise.C = (data>>4)&0x01
+			self.noise.envelope.loop = (data>>5)&0x01
+			self.noise.H = self.noise.envelope.loop
+			self.noise.v = data&0x0F
+
+		elif addr == 0x400E:
+			...
+
+		elif addr == 0x400F:
+			...
+
 		elif addr == 0x4015:	# Status register Enable/Disable channels
 			self.pulse_1.enable = True if data & 0b01 else False
 			self.pulse_2.enable = True if data & 0b10 else False
 			self.triangle.enable = True if data & 0b100 else False
-			# self.noise_channel.enable = True if (data & 0b1000) else False
+			self.noise.enable = True if (data & 0b1000) else False
 
 			if not self.pulse_1.enable:
 				self.pulse_1.length_counter = 0

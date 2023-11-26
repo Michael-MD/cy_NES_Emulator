@@ -70,6 +70,20 @@ cdef class TriangleWave(Channel):
 	cdef uint8_t linear_counter_reload_f
 	cdef uint8_t new_linear_counter
 
+
+	cdef void update_wave(self)
+
+cdef class Noise(Channel):
+	cdef uint8_t period
+	cdef uint8_t loop
+	cdef uint8_t C
+	cdef uint8_t H
+	
+	cdef uint8_t _v
+	cdef float _volume
+
+	cdef Envelope envelope
+
 	cdef void update_wave(self)
 
 cdef class APU:
@@ -78,6 +92,7 @@ cdef class APU:
 	cdef PulseWave pulse_1
 	cdef PulseWave pulse_2
 	cdef TriangleWave triangle
+	cdef Noise noise
 
 	# Frame counter
 	cdef uint8_t _fc_mode
