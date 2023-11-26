@@ -42,12 +42,14 @@ cdef class Channel:
 	cdef object stream
 	
 	cdef uint8_t param_changed
-	cdef uint8_t length_counter
+	cdef uint8_t _length_counter
 
 
 	cdef uint8_t _enable
 	cdef float _freq
 	cdef uint16_t timer
+
+	cdef void update_wave(self)
 
 cdef class PulseWave(Channel):
 	cdef uint8_t _v
@@ -59,9 +61,16 @@ cdef class PulseWave(Channel):
 	cdef Envelope envelope
 	cdef Sweep sweep
 
+	cdef void update_wave(self)
+
 
 cdef class TriangleWave(Channel):
-	cdef uint8_t C
+	cdef uint8_t C 		# Length counter halt / linear counter control
+	cdef uint8_t _linear_counter
+	cdef uint8_t linear_counter_reload_f
+	cdef uint8_t new_linear_counter
+
+	cdef void update_wave(self)
 
 cdef class APU:
 	cdef uint32_t n_apu_clock_cycles

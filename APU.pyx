@@ -35,7 +35,7 @@ cdef class Divider:
 
 
 cdef class Envelope:
-	def __init__(self):
+	def __cinit__(self):
 		self.start = 0
 		self.decay_lvl = 0
 		self.loop = 0
@@ -126,6 +126,7 @@ cdef class Channel:
 				stream_callback=self.update_buffer)
 		self.stream.start_stream()
 
+
 	def update_buffer(self, in_data, frame_count, time_info, status):
 		if self.param_changed and self.enable:
 			self.update_wave()
@@ -139,7 +140,7 @@ cdef class Channel:
 
 		return (samples_to_play.tobytes(), pyaudio.paContinue)
 
-	def update_wave(self):	# Intended to be overwritten in derived class
+	cdef void update_wave(self):	# Intended to be overwritten in derived class
 		...
 
 
@@ -155,6 +156,16 @@ cdef class Channel:
 			if not self._enable:
 				# self.buffer = np.asarray([], dtype=np.float32)
 				self.wave = np.zeros(buffer_size, dtype=np.float32)
+	
+	@property
+	def length_counter(self):
+		return self._length_counter
+
+	@length_counter.setter
+	def length_counter(self, v):
+		self._length_counter = v
+		if self._length_counter == 0:
+			self.wave = np.zeros(buffer_size, dtype=np.float32)
 
 	@property
 	def freq(self):
@@ -209,7 +220,7 @@ cdef class PulseWave(Channel):
 			self.envelope.divider.period = vv
 			self.volume = vv
 
-	def update_wave(self):
+	cdef void update_wave(self):
 		cycles = int(np.ceil(buffer_size/self.fs*self.freq)+1)
 		num_samples = int(np.round(self.fs / self.freq))
 		
@@ -224,23 +235,38 @@ cdef class PulseWave(Channel):
 
 
 cdef class TriangleWave(Channel):
-	def approx_sin(self, t):
-		j = t * 0.15915
-		j = j - np.floor(j)
-		return (20.785 * j * (j-.5) * (j-1))
+	def __cinit__(self):
+		self.linear_counter_reload_f = False
 
-	def update_wave(self):
+	@property
+	def linear_counter(self):
+		return self._linear_counter
+
+	@linear_counter.setter
+	def linear_counter(self, v):
+		self._linear_counter = v
+		if self._linear_counter == 0:
+			self.wave = np.zeros(buffer_size, dtype=np.float32)
+
+
+	cdef void update_wave(self):
 		cycles = int(np.ceil(buffer_size/self.fs*self.freq)+1)
 		num_samples = int(np.round(self.fs / self.freq))
 		
-		cdef float A = .1
-		signal = np.full(num_samples, -A/2)
+		cdef float A = .2
+		if self.linear_counter > 0 and self.length_counter > 0 and self.freq < 1500:
+			signal = np.full(num_samples, -A/2)
 
-		t = np.arange(num_samples) / self.fs
-		signal[:int(num_samples * .5)] = A/2
-		signal = np.cumsum(signal) * 4 / num_samples - A/2
+			t = np.arange(num_samples) / self.fs
+			signal[:int(num_samples * .5)] = A/2
+			signal = np.cumsum(signal) * 4 / num_samples - A/2
 
-		self.wave = np.tile(signal.astype(np.float32), cycles)
+			self.wave = np.tile(
+					np.roll(signal, -int(num_samples/4)).astype(np.float32)
+				, cycles)
+		else:
+			np.zeros(buffer_size)
+
 
 
 cdef class APU:
@@ -325,6 +351,21 @@ cdef class APU:
 
 				if self.pulse_2.H==0 and self.pulse_2.length_counter != 0:
 					self.pulse_2.length_counter -= 1
+
+
+				# Load/decrement triangle linear counter
+				# print(self.triangle.linear_counter_reload_f, self.triangle.linear_counter, self.triangle.freq)
+				if self.triangle.linear_counter_reload_f:
+					self.triangle.linear_counter = self.triangle.new_linear_counter
+					self.triangle.param_changed = True
+
+				elif self.triangle.linear_counter != 0:
+					self.triangle.linear_counter -= 1
+
+
+				if self.triangle.C == 0:
+					self.triangle.linear_counter_reload_f = 0
+
 
 	cdef void cpu_write(self, uint16_t addr, uint8_t data):
 		if addr == 0x4000:	# Pulse 1 duty cycle
@@ -416,7 +457,9 @@ cdef class APU:
 
 			self.pulse_2.envelope.start = 1
 
-			# TODO: Reset triangle reload flag
+		elif addr == 0x4008: 	# Triangle linear counter
+			self.triangle.new_linear_counter = data & 0x7F
+			self.triangle.C = data>>7
 		
 		elif addr == 0x400A:	# Triangle lo bit t
 			self.triangle.timer = (self.triangle.timer&0x0FF00)|data
@@ -424,6 +467,10 @@ cdef class APU:
 		elif addr == 0x400B:	# Triangle hi bit t
 			self.triangle.timer = ((data&0b111)<<8) | (self.triangle.timer&0x000FF)
 			self.triangle.freq = 1789773 / (32*(self.triangle.timer+1))
+
+			self.triangle.length_counter = length_conter_tbl[data>>3]
+
+			self.triangle.linear_counter_reload_f = True
 
 		elif addr == 0x4015:	# Status register Enable/Disable channels
 			self.pulse_1.enable = True if data & 0b01 else False
@@ -436,6 +483,8 @@ cdef class APU:
 
 			if not self.pulse_2.enable:
 				self.pulse_2.length_counter = 0
+
+			# TODO: Triangle wave length counter reset
 
 		elif addr == 0x4017:	# Frame counter status
 			self._fc_mode = (data&0x80)>>7 	# if mode=0: 4-step, mode=1: 5-step
