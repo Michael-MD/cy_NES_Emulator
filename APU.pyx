@@ -350,6 +350,18 @@ cdef class APU:
 				self.pulse_2.volume = self.pulse_2.envelope.decay_lvl / 15
 				self.pulse_2.param_changed = True
 
+
+		# Load/decrement triangle linear counter
+		if self.triangle.linear_counter_reload_f:
+			self.triangle.linear_counter = self.triangle.new_linear_counter
+			self.triangle.param_changed = True
+
+		elif self.triangle._linear_counter != 0:
+			self.triangle.linear_counter -= 1
+
+		if self.triangle.C == 0:
+			self.triangle.linear_counter_reload_f = 0
+
 	cdef void half_frame_clock(self):
 
 		if self.pulse_1.sweep.clock() and self.pulse_1.sweep.enable and not self.pulse_1.sweep.sweep_mute:
@@ -372,14 +384,14 @@ cdef class APU:
 
 			# Mode 0: 4-step mode
 			if self._fc_mode == 0:
-				if self._fc_counter%3728 == 0:
+				if self._fc_counter == 3728:
 					self.quarter_frame_clock()
-				elif self._fc_counter%7456 == 0:
+				elif self._fc_counter == 7456:
 					self.quarter_frame_clock()
 					self.half_frame_clock()
-				elif self._fc_counter%11185 == 0:
+				elif self._fc_counter == 11185:
 					self.quarter_frame_clock()
-				elif self._fc_counter%14916 == 0:
+				elif self._fc_counter == 14916:
 					self.quarter_frame_clock()
 					self.half_frame_clock()
 
@@ -391,16 +403,16 @@ cdef class APU:
 
 			# Mode 1: 5-step mode
 			if self._fc_mode == 1:
-				if self._fc_counter%3728 == 0:
+				if self._fc_counter == 3728:
 					self.quarter_frame_clock()
-				elif self._fc_counter%7456 == 0:
+				elif self._fc_counter == 7456:
 					self.quarter_frame_clock()
 					self.half_frame_clock()
-				elif self._fc_counter%11185 == 0:
+				elif self._fc_counter == 11185:
 					self.quarter_frame_clock()
-				elif self._fc_counter%14914 == 0:
+				elif self._fc_counter == 14914:
 					...	
-				elif self._fc_counter%18641 == 0:
+				elif self._fc_counter == 18640:
 					self.quarter_frame_clock()
 					self.half_frame_clock()
 
@@ -419,19 +431,6 @@ cdef class APU:
 
 				if self.noise.H==0 and self.noise._length_counter != 0:
 					self.noise.length_counter -= 1
-
-
-				# Load/decrement triangle linear counter
-				if self.triangle.linear_counter_reload_f:
-					self.triangle.linear_counter = self.triangle.new_linear_counter
-					self.triangle.param_changed = True
-
-				elif self.triangle._linear_counter != 0:
-					self.triangle.linear_counter -= 1
-
-
-				if self.triangle.C == 0:
-					self.triangle.linear_counter_reload_f = 0
 
 
 	cdef void cpu_write(self, uint16_t addr, uint8_t data):
@@ -526,7 +525,7 @@ cdef class APU:
 		elif addr == 0x4008: 	# Triangle linear counter
 			self.triangle.new_linear_counter = data & 0x7F
 			self.triangle.C = data>>7
-		
+
 		elif addr == 0x400A:	# Triangle lo bit t
 			self.triangle.timer = (self.triangle.timer&0x0FF00)|data
 
@@ -552,10 +551,10 @@ cdef class APU:
 			self.noise._length_counter = length_conter_tbl[data>>3]
 
 		elif addr == 0x4015:	# Status register Enable/Disable channels
-			self.pulse_1.enable = True if data & 0b01 else False
-			self.pulse_2.enable = True if data & 0b10 else False
+			# self.pulse_1.enable = True if data & 0b01 else False
+			# self.pulse_2.enable = True if data & 0b10 else False
 			self.triangle.enable = True if data & 0b100 else False
-			self.noise.enable = True if data & 0b1000 else False
+			# self.noise.enable = True if data & 0b1000 else False
 
 			if not self.pulse_1._enable:
 				self.pulse_1.length_counter = 0
@@ -563,7 +562,8 @@ cdef class APU:
 			if not self.pulse_2.enable:
 				self.pulse_2.length_counter = 0
 
-			# TODO: Triangle wave length counter reset
+			if not self.triangle.enable:
+				self.triangle.length_counter = 0
 
 		elif addr == 0x4017:	# Frame counter status
 			self._fc_mode = (data&0x80)>>7 	# if mode=0: 4-step, mode=1: 5-step
@@ -579,8 +579,8 @@ cdef class APU:
 				self._fc_irq = 0
 				self._fc_env_lin_counter = ((data&0b11100)>>1)|(data&0x01)
 
-				self.quarter_frame_clock()
-				self.half_frame_clock()
+			self.quarter_frame_clock()
+			self.half_frame_clock()
 
 
 	cdef uint8_t cpu_read(self, uint16_t addr):
