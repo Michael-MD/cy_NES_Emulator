@@ -4,6 +4,9 @@ cdef extern from "stdint.h":
 	ctypedef short int16_t
 	ctypedef unsigned int uint32_t
 
+from libc.math cimport round, ceil
+
+
 cdef class Divider:
 	cdef uint16_t period
 	cdef uint16_t counter
