@@ -202,12 +202,17 @@ cdef class PulseWave(Channel):
 
 	@volume.setter
 	def volume(self, vv):
-		if self._volume != vv:
+		cdef float m, f
+		cdef int i
+		if self._volume != vv / 15:
 
 			if self.C == 1:
 				self._volume = vv / 15
 			else:
-				self._volume = self.envelope.decay_lvl / 15
+				if self.envelope.divider.period == 0:
+					self._volume = 0
+				else:
+					self._volume = self.envelope.decay_lvl / 15
 
 			# TODO: modify wave rather than recalc
 			self.param_changed = True
@@ -227,7 +232,6 @@ cdef class PulseWave(Channel):
 	cdef void update_wave(self):
 		cdef int cycles = <int> ceil(buffer_size/self.fs*self._freq)+1
 		cdef int num_samples = <int> round(self.fs / self._freq)
-		
 		cdef float A = .1 * self._volume
 		cdef float[:] signal = np.full(num_samples * cycles, -A/2, dtype=np.float32)
 		cdef int hi_ind = int(num_samples * self._dc)
@@ -298,7 +302,7 @@ cdef class Noise(Channel):
 
 	@volume.setter
 	def volume(self, vv):
-		if self._volume != vv:
+		if self._volume != vv / 15:
 
 			if self.C == 1:
 				self._volume = vv / 15
@@ -404,16 +408,16 @@ cdef class APU:
 
 			# Increment length counters
 			if self._fc_counter == 0:
-				if self.pulse_1.H==0 and self.pulse_1.length_counter != 0:
+				if self.pulse_1.H==0 and self.pulse_1._length_counter != 0:
 					self.pulse_1.length_counter -= 1
 
-				if self.pulse_2.H==0 and self.pulse_2.length_counter != 0:
+				if self.pulse_2.H==0 and self.pulse_2._length_counter != 0:
 					self.pulse_2.length_counter -= 1
 
-				if self.triangle.C==0 and self.triangle.length_counter != 0:
+				if self.triangle.C==0 and self.triangle._length_counter != 0:
 					self.triangle.length_counter -= 1
 
-				if self.noise.H==0 and self.noise.length_counter != 0:
+				if self.noise.H==0 and self.noise._length_counter != 0:
 					self.noise.length_counter -= 1
 
 
@@ -422,7 +426,7 @@ cdef class APU:
 					self.triangle.linear_counter = self.triangle.new_linear_counter
 					self.triangle.param_changed = True
 
-				elif self.triangle.linear_counter != 0:
+				elif self.triangle._linear_counter != 0:
 					self.triangle.linear_counter -= 1
 
 
@@ -469,8 +473,8 @@ cdef class APU:
 			# Reset envelope period
 			self.pulse_1.envelope.decay_lvl = 15
 
-			if self.pulse_1.enable:
-				self.pulse_1.length_counter = length_conter_tbl[data>>3]
+			if self.pulse_1._enable:
+				self.pulse_1._length_counter = length_conter_tbl[data>>3]
 
 			self.pulse_1.envelope.start = 1
 
@@ -515,7 +519,7 @@ cdef class APU:
 			self.pulse_2.envelope.decay_lvl = 15
 
 			if self.pulse_2.enable:
-				self.pulse_2.length_counter = length_conter_tbl[data>>3]
+				self.pulse_2._length_counter = length_conter_tbl[data>>3]
 
 			self.pulse_2.envelope.start = 1
 
@@ -530,7 +534,7 @@ cdef class APU:
 			self.triangle.timer = ((data&0b111)<<8) | (self.triangle.timer&0x000FF)
 			self.triangle.freq = 1789773 / (32*(self.triangle.timer+1))
 
-			self.triangle.length_counter = length_conter_tbl[data>>3]
+			self.triangle._length_counter = length_conter_tbl[data>>3]
 
 			self.triangle.linear_counter_reload_f = True
 
@@ -545,15 +549,15 @@ cdef class APU:
 			self.noise.loop = data>>7
 
 		elif addr == 0x400F:		# Noise length counter
-			self.noise.length_counter = length_conter_tbl[data>>3]
+			self.noise._length_counter = length_conter_tbl[data>>3]
 
 		elif addr == 0x4015:	# Status register Enable/Disable channels
-			# self.pulse_1.enable = True if data & 0b01 else False
-			# self.pulse_2.enable = True if data & 0b10 else False
+			self.pulse_1.enable = True if data & 0b01 else False
+			self.pulse_2.enable = True if data & 0b10 else False
 			self.triangle.enable = True if data & 0b100 else False
-			# self.noise.enable = True if data & 0b1000 else False
+			self.noise.enable = True if data & 0b1000 else False
 
-			if not self.pulse_1.enable:
+			if not self.pulse_1._enable:
 				self.pulse_1.length_counter = 0
 
 			if not self.pulse_2.enable:
@@ -574,6 +578,9 @@ cdef class APU:
 				self._fc_length_counter = ((data&0b1000)>>2)|(data&0x01)
 				self._fc_irq = 0
 				self._fc_env_lin_counter = ((data&0b11100)>>1)|(data&0x01)
+
+				self.quarter_frame_clock()
+				self.half_frame_clock()
 
 
 	cdef uint8_t cpu_read(self, uint16_t addr):

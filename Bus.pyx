@@ -58,6 +58,10 @@ cdef class Bus:
 					self.cpu.clock()
 					self.apu.clock()
 
+					if self.apu._fc_irq:
+						self.apu._fc_irq = False
+						self.cpu.set_irq(1)
+
 			if self.ppu.nmi:
 				self.ppu.nmi = False
 				self.cpu.set_nmi(1)
