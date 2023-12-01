@@ -52,6 +52,7 @@ cdef class Channel:
 	cdef float _freq
 	cdef uint16_t timer
 
+	cdef void empty_buffer(self)
 	cdef void update_wave(self)
 
 cdef class PulseWave(Channel):

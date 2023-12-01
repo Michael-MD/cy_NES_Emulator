@@ -143,6 +143,9 @@ cdef class Channel:
 
 		return (samples_to_play.tobytes(), pyaudio.paContinue)
 
+	cdef void empty_buffer(self):
+		self.buffer = np.asarray([], dtype=np.float32)
+
 	cdef void update_wave(self):	# Intended to be overwritten in derived class
 		...
 
@@ -350,7 +353,6 @@ cdef class APU:
 				self.pulse_2.volume = self.pulse_2.envelope.decay_lvl / 15
 				self.pulse_2.param_changed = True
 
-
 		# Load/decrement triangle linear counter
 		if self.triangle.linear_counter_reload_f:
 			self.triangle.linear_counter = self.triangle.new_linear_counter
@@ -477,7 +479,7 @@ cdef class APU:
 
 			self.pulse_1.envelope.start = 1
 
-			# TODO: Reset pulse channel phase
+			self.pulse_1.empty_buffer()
 
 		elif addr == 0x4004:	# Pulse 2 duty cycle
 			if (data>>6) == 0:	# 12.5% d.c
@@ -522,6 +524,8 @@ cdef class APU:
 
 			self.pulse_2.envelope.start = 1
 
+			self.pulse_2.empty_buffer()
+
 		elif addr == 0x4008: 	# Triangle linear counter
 			self.triangle.new_linear_counter = data & 0x7F
 			self.triangle.C = data>>7
@@ -552,8 +556,8 @@ cdef class APU:
 
 		elif addr == 0x4015:	# Status register Enable/Disable channels
 			# self.pulse_1.enable = True if data & 0b01 else False
-			# self.pulse_2.enable = True if data & 0b10 else False
-			self.triangle.enable = True if data & 0b100 else False
+			self.pulse_2.enable = True if data & 0b10 else False
+			# self.triangle.enable = True if data & 0b100 else False
 			# self.noise.enable = True if data & 0b1000 else False
 
 			if not self.pulse_1._enable:
