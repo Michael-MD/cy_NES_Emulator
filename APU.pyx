@@ -469,8 +469,6 @@ cdef class APU:
 			self.pulse_1.sweep.current_period = self.pulse_1.timer
 			self.pulse_1.freq = 1789773 / (16*(self.pulse_1.timer+1))
 
-			self.pulse_1.empty_buffer()
-
 		elif addr == 0x4003:	# Pulse 1 hi bit t
 			self.pulse_1.timer = ((data&0b111)<<8) | (self.pulse_1.timer&0x000FF)
 			self.pulse_1.sweep.current_period = self.pulse_1.timer
@@ -518,8 +516,6 @@ cdef class APU:
 			self.pulse_2.sweep.current_period = self.pulse_2.timer
 			self.pulse_2.freq = 1789773 / (16*(self.pulse_2.timer+1))
 			
-			self.pulse_2.empty_buffer()
-
 		elif addr == 0x4007:	# Pulse 2 hi bit t
 			self.pulse_2.timer = ((data&0b111)<<8) | (self.pulse_2.timer&0x000FF)
 			self.pulse_2.sweep.current_period = self.pulse_2.timer
@@ -568,7 +564,7 @@ cdef class APU:
 			self.pulse_1.enable = True if data & 0b01 else False
 			self.pulse_2.enable = True if data & 0b10 else False
 			self.triangle.enable = True if data & 0b100 else False
-			self.noise.enable = True if data & 0b1000 else False
+			# self.noise.enable = True if data & 0b1000 else False
 
 			if not self.pulse_1._enable:
 				self.pulse_1.length_counter = 0
