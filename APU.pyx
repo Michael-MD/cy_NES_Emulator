@@ -378,6 +378,19 @@ cdef class APU:
 			self.pulse_2.sweep.current_period = self.pulse_2.sweep.target_period
 			self.pulse_2.freq = 1789773 / (16*(self.pulse_2.timer+1))
 
+		# Decrement length counters
+		if self.pulse_1.H==0 and self.pulse_1._length_counter != 0:
+			self.pulse_1.length_counter -= 1
+
+		if self.pulse_2.H==0 and self.pulse_2._length_counter != 0:
+			self.pulse_2.length_counter -= 1
+
+		if self.triangle.C==0 and self.triangle._length_counter != 0:
+			self.triangle.length_counter -= 1
+
+		if self.noise.H==0 and self.noise._length_counter != 0:
+			self.noise.length_counter -= 1
+
 	cdef void clock(self):
 		self.n_apu_clock_cycles += 1
 
@@ -422,20 +435,6 @@ cdef class APU:
 
 					self._fc_counter = 0
 
-			# Increment length counters
-			if self._fc_counter == 0:
-				if self.pulse_1.H==0 and self.pulse_1._length_counter != 0:
-					self.pulse_1.length_counter -= 1
-
-				if self.pulse_2.H==0 and self.pulse_2._length_counter != 0:
-					self.pulse_2.length_counter -= 1
-
-				if self.triangle.C==0 and self.triangle._length_counter != 0:
-					self.triangle.length_counter -= 1
-
-				if self.noise.H==0 and self.noise._length_counter != 0:
-					self.noise.length_counter -= 1
-
 
 	cdef void cpu_write(self, uint16_t addr, uint8_t data):
 		if addr == 0x4000:	# Pulse 1 duty cycle
@@ -467,11 +466,15 @@ cdef class APU:
 
 		elif addr == 0x4002:	# Pulse 1 lo bit t
 			self.pulse_1.timer = (self.pulse_1.timer&0x0FF00)|data
+			self.pulse_1.sweep.current_period = self.pulse_1.timer
+			self.pulse_1.freq = 1789773 / (16*(self.pulse_1.timer+1))
+
+			self.pulse_1.empty_buffer()
 
 		elif addr == 0x4003:	# Pulse 1 hi bit t
 			self.pulse_1.timer = ((data&0b111)<<8) | (self.pulse_1.timer&0x000FF)
 			self.pulse_1.sweep.current_period = self.pulse_1.timer
-			self.pulse_1.freq = 1.789773*1e6 / (16*(self.pulse_1.timer+1))
+			self.pulse_1.freq = 1789773 / (16*(self.pulse_1.timer+1))
 
 			# Reset envelope period
 			self.pulse_1.envelope.decay_lvl = 15
@@ -512,13 +515,15 @@ cdef class APU:
 
 		elif addr == 0x4006:	# Pulse 2 lo bit t
 			self.pulse_2.timer = (self.pulse_2.timer&0x0FF00)|data
+			self.pulse_2.sweep.current_period = self.pulse_2.timer
+			self.pulse_2.freq = 1789773 / (16*(self.pulse_2.timer+1))
 			
+			self.pulse_2.empty_buffer()
+
 		elif addr == 0x4007:	# Pulse 2 hi bit t
 			self.pulse_2.timer = ((data&0b111)<<8) | (self.pulse_2.timer&0x000FF)
 			self.pulse_2.sweep.current_period = self.pulse_2.timer
-			self.pulse_2.freq = 1789773 / (16*(self.pulse_2.timer+1))	
-
-			# print(self.pulse_2.freq)
+			self.pulse_2.freq = 1789773 / (16*(self.pulse_2.timer+1))
 
 			# Reset envelope period
 			self.pulse_2.envelope.decay_lvl = 15
@@ -559,8 +564,8 @@ cdef class APU:
 			self.noise._length_counter = length_conter_tbl[data>>3]
 
 		elif addr == 0x4015:	# Status register Enable/Disable channels
-			# self.pulse_1.enable = True if data & 0b01 else False
-			# self.pulse_2.enable = True if data & 0b10 else False
+			self.pulse_1.enable = True if data & 0b01 else False
+			self.pulse_2.enable = True if data & 0b10 else False
 			self.triangle.enable = True if data & 0b100 else False
 			# self.noise.enable = True if data & 0b1000 else False
 
