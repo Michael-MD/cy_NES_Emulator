@@ -269,7 +269,7 @@ cdef class TriangleWave(Channel):
 		cdef int cycles = <int> ceil(buffer_size/self.fs*self._freq)+1
 		cdef int num_samples = <int> round(self.fs / self._freq)
 		
-		cdef float A = .2
+		cdef float A = .1
 		cdef float[:] signal
 		cdef int hi_ind = int(num_samples * .5)
 		cdef uint32_t i, s, e
@@ -541,6 +541,7 @@ cdef class APU:
 
 		elif addr == 0x400A:	# Triangle lo bit t
 			self.triangle.timer = (self.triangle.timer&0x0FF00)|data
+			self.triangle.freq = 1789773 / (32*(self.triangle.timer+1))
 
 		elif addr == 0x400B:	# Triangle hi bit t
 			self.triangle.timer = ((data&0b111)<<8) | (self.triangle.timer&0x000FF)
@@ -567,7 +568,7 @@ cdef class APU:
 			self.pulse_1.enable = True if data & 0b01 else False
 			self.pulse_2.enable = True if data & 0b10 else False
 			self.triangle.enable = True if data & 0b100 else False
-			# self.noise.enable = True if data & 0b1000 else False
+			self.noise.enable = True if data & 0b1000 else False
 
 			if not self.pulse_1._enable:
 				self.pulse_1.length_counter = 0
