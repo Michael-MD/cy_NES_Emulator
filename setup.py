@@ -7,6 +7,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 with open(f"{SCRIPT_DIR}/requirements.txt", "r") as f:
     dependencies = f.read().split('\n')
 
+
 setup(
 	name='NES Emulator',
 	version="1.0",
@@ -21,12 +22,7 @@ setup(
     	'PPU.pyx',
     	'APU.pyx',
     	'Cartridge.pyx',
-    	# 'Screen.pyx',
     	'NES.pyx',
-    	# 'Mappers/Mapper.pyx',
-    	# 'Mappers/Mapper000.pyx',
-    	# 'EmulationDebugger.pyx',
-    	# 'available_colours.pyx',
     ]),
     install_requires=dependencies,
 )

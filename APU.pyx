@@ -1,3 +1,5 @@
+# cython: boundscheck=False, wraparound=False, initializedcheck=False, cdivision_warnings=False
+
 import pyaudio
 import numpy as np
 
@@ -287,7 +289,7 @@ cdef class TriangleWave(Channel):
 				signal[i] = (signal[i-1] + signal[i]) 
 
 			for i in range(num_samples * cycles):
-				signal[i] = signal[i] * c - A/2
+				signal[i] = signal[i] * c
 
 		else:
 			signal = np.zeros(buffer_size, dtype=np.float32)
@@ -516,6 +518,8 @@ cdef class APU:
 			self.pulse_2.sweep.current_period = self.pulse_2.timer
 			self.pulse_2.freq = 1789773 / (16*(self.pulse_2.timer+1))	
 
+			# print(self.pulse_2.freq)
+
 			# Reset envelope period
 			self.pulse_2.envelope.decay_lvl = 15
 
@@ -556,8 +560,8 @@ cdef class APU:
 
 		elif addr == 0x4015:	# Status register Enable/Disable channels
 			# self.pulse_1.enable = True if data & 0b01 else False
-			self.pulse_2.enable = True if data & 0b10 else False
-			# self.triangle.enable = True if data & 0b100 else False
+			# self.pulse_2.enable = True if data & 0b10 else False
+			self.triangle.enable = True if data & 0b100 else False
 			# self.noise.enable = True if data & 0b1000 else False
 
 			if not self.pulse_1._enable:
