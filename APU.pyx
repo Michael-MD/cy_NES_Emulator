@@ -173,6 +173,7 @@ cdef class Channel:
 	def length_counter(self, v):
 		self._length_counter = v
 		if self._length_counter == 0:
+			# TODO: set current wave to zero rather than make new array
 			self.wave = np.zeros(buffer_size, dtype=np.float32)
 
 	@property
@@ -354,6 +355,11 @@ cdef class APU:
 			if self.pulse_2.C != 1:
 				self.pulse_2.volume = self.pulse_2.envelope.decay_lvl / 15
 				self.pulse_2.param_changed = True
+
+		if self.noise.envelope.clock():
+			if self.noise.C != 1:
+				self.noise.volume = self.noise.envelope.decay_lvl / 15
+				self.noise.param_changed = True
 
 		# Load/decrement triangle linear counter
 		if self.triangle.linear_counter_reload_f:
@@ -561,11 +567,12 @@ cdef class APU:
 			self.noise._length_counter = length_conter_tbl[data>>3]
 
 		elif addr == 0x4015:	# Status register Enable/Disable channels
-			self.pulse_1.enable = True if data & 0b01 else False
-			self.pulse_2.enable = True if data & 0b10 else False
-			self.triangle.enable = True if data & 0b100 else False
-			# self.noise.enable = True if data & 0b1000 else False
+			# self.pulse_1.enable = True if data & 0b01 else False
+			# self.pulse_2.enable = True if data & 0b10 else False
+			# self.triangle.enable = True if data & 0b100 else False
+			self.noise.enable = True if data & 0b1000 else False
 
+			# TODO: use _length_counter here
 			if not self.pulse_1._enable:
 				self.pulse_1.length_counter = 0
 
