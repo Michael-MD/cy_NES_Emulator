@@ -388,7 +388,7 @@ cdef class Noise(Channel):
 		
 		cdef int i, j
 		cdef int dur_per_sample_samples_rounded = <int> dur_per_sample_samples
-		cdef float A  = .1 * self._volume
+		cdef float A  = .05 * self._volume
 		cdef int full_wave_len = <int> (num_samples * cycles * dur_per_sample_samples_rounded)
 		self.wave = np.empty(full_wave_len, dtype=np.float32)
 
@@ -633,9 +633,9 @@ cdef class APU:
 			self.noise._length_counter = length_conter_tbl[data>>3]
 
 		elif addr == 0x4015:	# Status register Enable/Disable channels
-			# self.pulse_1.enable = True if data & 0b01 else False
-			# self.pulse_2.enable = True if data & 0b10 else False
-			# self.triangle.enable = True if data & 0b100 else False
+			self.pulse_1.enable = True if data & 0b01 else False
+			self.pulse_2.enable = True if data & 0b10 else False
+			self.triangle.enable = True if data & 0b100 else False
 			self.noise.enable = True if data & 0b1000 else False
 
 			# TODO: use _length_counter here
