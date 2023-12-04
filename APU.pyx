@@ -335,6 +335,21 @@ cdef class Noise(Channel):
 
 			self.empty_buffer()
 
+	@property
+	def freq(self):
+		return self._freq
+
+	@freq.setter
+	def freq(self, v):
+		if self._freq != v:
+			self._freq = v
+			self.param_changed = True
+
+			self.empty_buffer()
+
+	@property
+	def length_counter(self):
+		return self._length_counter
 
 	cdef void update_wave(self):
 		cdef float dur_per_sample_s, dur_per_sample_samples
@@ -359,14 +374,13 @@ cdef class Noise(Channel):
 		else:
 			random_seqeunce = (bernoulli.rvs(size=<int> (dur_per_sample_samples * sequence_len), p=0.5) * A * self._volume).astype(np.float32)
 
-		cycles = <int> np.ceil(buffer_size / self.fs * self._freq)
+		cycles = <int> ceil(buffer_size/self.fs*self._freq)+1
 		num_samples =  <int> np.round(self.fs / self._freq)
 
 		self.wave = np.tile(
 			random_seqeunce,
 			cycles,
 		)
-
 
 cdef class APU:
 	def __cinit__(self):
@@ -600,8 +614,6 @@ cdef class APU:
 				self.noise.freq = 1789773 / self.noise.timer / 93
 			else:
 				self.noise.freq = 1789773 / self.noise.timer / 32767
-
-			self.noise.empty_buffer()
 
 		elif addr == 0x400F:		# Noise length counter
 			self.noise._length_counter = length_conter_tbl[data>>3]
