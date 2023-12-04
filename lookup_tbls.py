@@ -34,3 +34,23 @@ length_conter_tbl[0x1C] = 16
 length_conter_tbl[0x1D] = 28
 length_conter_tbl[0x1E] = 32
 length_conter_tbl[0x1F] = 30
+
+
+noise_period_tbl = np.zeros(16, dtype=np.uint16)
+
+noise_period_tbl[0x0] = 4
+noise_period_tbl[0x1] = 8
+noise_period_tbl[0x2] = 16
+noise_period_tbl[0x3] = 32
+noise_period_tbl[0x4] = 64
+noise_period_tbl[0x5] = 96
+noise_period_tbl[0x6] = 128
+noise_period_tbl[0x7] = 160
+noise_period_tbl[0x8] = 202
+noise_period_tbl[0x9] = 254
+noise_period_tbl[0xA] = 380
+noise_period_tbl[0xB] = 508
+noise_period_tbl[0xC] = 762
+noise_period_tbl[0xD] = 1016
+noise_period_tbl[0xE] = 2034
+noise_period_tbl[0xF] = 4068

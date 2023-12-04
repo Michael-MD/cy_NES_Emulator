@@ -3,3 +3,4 @@ numpy
 tk
 pygame>=2.5.1
 setuptools
+scipy

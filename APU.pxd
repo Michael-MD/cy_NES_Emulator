@@ -79,7 +79,7 @@ cdef class TriangleWave(Channel):
 
 cdef class Noise(Channel):
 	cdef uint8_t period
-	cdef uint8_t loop
+	cdef uint8_t mode
 	cdef uint8_t C
 	cdef uint8_t H
 	

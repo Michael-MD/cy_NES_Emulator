@@ -2,8 +2,9 @@
 
 import pyaudio
 import numpy as np
+from scipy.stats import bernoulli
 
-from .length_conter_tbl import *
+from .lookup_tbls import *
 
 """
 The implementation of audio used here means buffer size sets 
@@ -329,11 +330,42 @@ cdef class Noise(Channel):
 			self.envelope.divider.period = vv
 			self.volume = vv
 
+			# TODO: modify wave rather than recalc
+			self.param_changed = True
+
+			self.empty_buffer()
+
 
 	cdef void update_wave(self):
+		cdef float dur_per_sample_s, dur_per_sample_samples
+		cdef uint32_t sequence_len
+		cdef int cycles, num_samples
+		cdef float[:] random_seqeunce
+
 		A = .1
 
-		self.wave = (np.random.uniform(-A/2, A/2, buffer_size*6)*self.volume).astype(np.float32)
+		if self.mode == 1:
+			sequence_len = 93
+		else:
+			sequence_len = 32767
+
+		dur_per_sample_s = 1 / (self._freq * sequence_len)
+		dur_per_sample_samples = dur_per_sample_s * self.fs
+
+		if dur_per_sample_samples >= 1:
+			random_seqeunce = np.repeat(
+				(bernoulli.rvs(size=sequence_len, p=0.5) * A * self._volume).astype(np.float32)
+				, <int> dur_per_sample_samples)
+		else:
+			random_seqeunce = (bernoulli.rvs(size=<int> (dur_per_sample_samples * sequence_len), p=0.5) * A * self._volume).astype(np.float32)
+
+		cycles = <int> np.ceil(buffer_size / self.fs * self._freq)
+		num_samples =  <int> np.round(self.fs / self._freq)
+
+		self.wave = np.tile(
+			random_seqeunce,
+			cycles,
+		)
 
 
 cdef class APU:
@@ -561,7 +593,15 @@ cdef class APU:
 
 		elif addr == 0x400E:		# Noise wave properties
 			self.noise.period = data&0x0F
-			self.noise.loop = data>>7
+			self.noise.timer = noise_period_tbl[self.noise.period]
+			self.noise.mode = data>>7
+
+			if self.noise.mode == 1:
+				self.noise.freq = 1789773 / self.noise.timer / 93
+			else:
+				self.noise.freq = 1789773 / self.noise.timer / 32767
+
+			self.noise.empty_buffer()
 
 		elif addr == 0x400F:		# Noise length counter
 			self.noise._length_counter = length_conter_tbl[data>>3]
