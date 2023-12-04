@@ -88,6 +88,8 @@ cdef class Noise(Channel):
 
 	cdef Envelope envelope
 
+	cdef float[:] rand_sequence
+
 	cdef void update_wave(self)
 
 cdef class APU:

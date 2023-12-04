@@ -303,6 +303,8 @@ cdef class Noise(Channel):
 	def __cinit__(self):
 		self.envelope = Envelope()
 
+		self.rand_sequence = bernoulli.rvs(size=1_638_350, p=0.5).astype(np.float32)
+
 	@property
 	def volume(self):
 		return self._volume
@@ -351,13 +353,19 @@ cdef class Noise(Channel):
 	def length_counter(self):
 		return self._length_counter
 
+	@length_counter.setter
+	def length_counter(self, v):
+		self._length_counter = v
+		if self._length_counter == 0:
+			# TODO: set current wave to zero rather than make new array
+			self.wave = np.zeros(buffer_size, dtype=np.float32)
+
+			self.empty_buffer()
+
 	cdef void update_wave(self):
 		cdef float dur_per_sample_s, dur_per_sample_samples
 		cdef uint32_t sequence_len
 		cdef int cycles, num_samples
-		cdef float[:] random_seqeunce
-
-		A = .1
 
 		if self.mode == 1:
 			sequence_len = 93
@@ -368,19 +376,25 @@ cdef class Noise(Channel):
 		dur_per_sample_samples = dur_per_sample_s * self.fs
 
 		if dur_per_sample_samples >= 1:
-			random_seqeunce = np.repeat(
-				(bernoulli.rvs(size=sequence_len, p=0.5) * A * self._volume).astype(np.float32)
-				, <int> dur_per_sample_samples)
+			num_samples =  sequence_len
 		else:
-			random_seqeunce = (bernoulli.rvs(size=<int> (dur_per_sample_samples * sequence_len), p=0.5) * A * self._volume).astype(np.float32)
+			num_samples =  <int> (dur_per_sample_samples * sequence_len)
+			dur_per_sample_samples = 1
 
-		cycles = <int> ceil(buffer_size/self.fs*self._freq)+1
-		num_samples =  <int> np.round(self.fs / self._freq)
-
-		self.wave = np.tile(
-			random_seqeunce,
-			cycles,
-		)
+		if num_samples < buffer_size:
+			cycles = <int> ceil(buffer_size/self.fs*self._freq)+1
+		else:
+			cycles = 1
+		
+		cdef int i, j
+		cdef int dur_per_sample_samples_rounded = <int> dur_per_sample_samples
+		cdef float A  = .1 * self._volume
+		cdef int full_wave_len = <int> (num_samples * cycles * dur_per_sample_samples_rounded)
+		self.wave = np.empty(full_wave_len, dtype=np.float32)
+		
+		for i in range(<int> (num_samples * cycles)):
+			for j in range(<int> dur_per_sample_samples_rounded):
+				self.wave[dur_per_sample_samples_rounded * i + j] = self.rand_sequence[i%num_samples] * A
 
 cdef class APU:
 	def __cinit__(self):
