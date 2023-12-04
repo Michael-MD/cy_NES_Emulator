@@ -3,6 +3,7 @@
 
 import os
 import numpy as np
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import pygame
 
 from .CPU6502 cimport CPU6502

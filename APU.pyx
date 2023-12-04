@@ -320,6 +320,7 @@ cdef class Noise(Channel):
 
 			# TODO: modify wave rather than recalc
 			self.param_changed = True
+			self.empty_buffer()
 
 	@property
 	def v(self):
@@ -334,7 +335,6 @@ cdef class Noise(Channel):
 
 			# TODO: modify wave rather than recalc
 			self.param_changed = True
-
 			self.empty_buffer()
 
 	@property
@@ -391,9 +391,9 @@ cdef class Noise(Channel):
 		cdef float A  = .1 * self._volume
 		cdef int full_wave_len = <int> (num_samples * cycles * dur_per_sample_samples_rounded)
 		self.wave = np.empty(full_wave_len, dtype=np.float32)
-		
+
 		for i in range(<int> (num_samples * cycles)):
-			for j in range(<int> dur_per_sample_samples_rounded):
+			for j in range(dur_per_sample_samples_rounded):
 				self.wave[dur_per_sample_samples_rounded * i + j] = self.rand_sequence[i%num_samples] * A
 
 cdef class APU:
